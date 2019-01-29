@@ -7,57 +7,7 @@
 #
 # In addition, mock CSI driver is hardcoded as the CSI driver.
 
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: csi-serviceaccount
 
----
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: external-runner
-rules:
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list"]
-  - apiGroups: [""]
-    resources: ["namespaces"]
-    verbs: ["get", "list"]
-  - apiGroups: [""]
-    resources: ["persistentvolumes"]
-    verbs: ["get", "list", "update", "watch", "create", "delete"]
-  - apiGroups: [""]
-    resources: ["nodes"]
-    verbs: ["get", "list", "watch", "update"]
-  - apiGroups: ["storage.k8s.io"]
-    resources: ["volumeattachments"]
-    verbs: ["get", "list", "watch", "update"]
-  - apiGroups: [""]
-    resources: ["persistentvolumeclaims"]
-    verbs: ["get", "list", "watch", "update"]
-  - apiGroups: ["storage.k8s.io"]
-    resources: ["storageclasses"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["events"]
-    verbs: ["list", "get", "watch", "create", "update", "patch"]
-
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: csi-role
-subjects:
-  - kind: ServiceAccount
-    name: csi-serviceaccount
-    namespace: default
-roleRef:
-  kind: ClusterRole
-  name: external-runner
-  apiGroup: rbac.authorization.k8s.io
-
----
 kind: Service
 apiVersion: v1
 metadata:
@@ -91,12 +41,10 @@ spec:
       - effect: NoSchedule
         operator: Exists
         key: node.cloudprovider.kubernetes.io/uninitialized
-      nodeSelector:
-         node-role.kubernetes.io/master: ""
       serviceAccount: csi-serviceaccount
       containers:
         - name: csi-provisioner
-          image: registry.cn-hangzhou.aliyuncs.com/plugins/csi-provisioner:v0.2.0
+          image: quay.io/k8scsi/csi-provisioner:v1.0.1
           args:
             - "--provisioner=csi-diskplugin"
             - "--csi-address=$(ADDRESS)"
@@ -109,7 +57,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/kubelet/plugins/csi-diskplugin
         - name: csi-attacher
-          image: registry.cn-hangzhou.aliyuncs.com/plugins/csi-attacher:v0.2.0
+          image: quay.io/k8scsi/csi-attacher:v1.0.1
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"

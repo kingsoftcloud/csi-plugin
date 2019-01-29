@@ -16,6 +16,8 @@ build:
 
 .PHONY: push
 push:
-	docker tag csi-diskplugin:$(VERSION) hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)
-	docker push hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)
+	# docker tag csi-diskplugin:$(VERSION) hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)
+	# docker push hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)
+	docker tag csi-diskplugin:$(VERSION) registry.cn-beijing.aliyuncs.com/hsxue/csi-diskplugin:$(VERSION)
+	docker push registry.cn-beijing.aliyuncs.com/hsxue/csi-diskplugin:$(VERSION) 
 

@@ -7,7 +7,7 @@ import (
 
 	glog "github.com/Sirupsen/logrus"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/kubernetes-csi/drivers/pkg/csi-common"
+	csicommon "github.com/kubernetes-csi/drivers/pkg/csi-common"
 	k8sclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -45,7 +45,7 @@ var (
 	openApiEndpoint = "api.ksyun.com"
 	openApiPrefix   = "https"
 
-	driverName = "csi-plugin"
+	driverName = "csi-diskplugin"
 	version    = "0.1"
 	endpoint   = flag.String("endpoint", "unix://tmp/csi.sock", "CSI endpoint")
 	nodeid     = flag.String("nodeid", "", "Node ID")

@@ -79,6 +79,12 @@
 			"revision": ""
 		},
 		{
+			"checksumSHA1": "GkrSvEhSvYWVb6dyKIS3oXgVlzY=",
+			"path": "github.com/container-storage-interface/spec",
+			"revision": "37e74064635d27c8e33537c863b37ccb1182d4f8",
+			"revisionTime": "2018-11-28T17:41:26Z"
+		},
+		{
 			"checksumSHA1": "EJF01Yis0Qa+Mboe5mHpK0kLuRM=",
 			"origin": "github.com/kubernetes-csi/drivers/vendor/github.com/container-storage-interface/spec/lib/go/csi",
 			"path": "github.com/container-storage-interface/spec/lib/go/csi",
@@ -1129,5 +1135,5 @@
 			"revision": ""
 		}
 	],
-	"rootPath": "ksc/csi-plugin"
+	"rootPath": "csi-plugin"
 }
