@@ -25,11 +25,9 @@ type Driver struct {
 	endpoint string
 	region   string
 
-	ebsClient *ebsClient.Client
+	ebsClient ebsClient.StorageService
 	k8sclient *k8sclient.Clientset
-
-	wg  sync.WaitGroup
-	srv *grpc.Server
+	srv       *grpc.Server
 
 	readyMu sync.Mutex
 	ready   bool
@@ -43,7 +41,7 @@ type DriverConfig struct {
 	Region     string
 }
 
-func NewDriver(config *DriverConfig, ebsClient *ebsClient.Client, k8sclient *k8sclient.Clientset) *Driver {
+func NewDriver(config *DriverConfig, ebsClient ebsClient.StorageService, k8sclient *k8sclient.Clientset) *Driver {
 	if config.DriverName == "" {
 		glog.Errorf("Driver name missing")
 		return nil
@@ -100,8 +98,7 @@ func (d *Driver) Run() error {
 	d.ready = true
 	glog.Infof("Listening for connections on address: %#v", listener.Addr())
 
-	d.srv.Serve(listener)
-	return nil
+	return d.srv.Serve(listener)
 }
 
 func (d *Driver) Stop() {
@@ -128,6 +125,7 @@ func ParseEndpoint(ep string) (string, string, error) {
 }
 
 func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	fmt.Println()
 	glog.V(3).Infof("GRPC call: %s", info.FullMethod)
 	glog.V(5).Infof("GRPC request: %s", protosanitizer.StripSecretsCSI03(req))
 	resp, err := handler(ctx, req)

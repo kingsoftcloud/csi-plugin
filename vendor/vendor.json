@@ -3,14 +3,6 @@
 	"ignore": "test",
 	"package": [
 		{
-			"path": "--tree",
-			"revision": ""
-		},
-		{
-			"path": "-tree",
-			"revision": ""
-		},
-		{
 			"checksumSHA1": "NX4v3cbkXAJxFlrncqT9yEUBuoA=",
 			"path": "github.com/PuerkitoBio/purell",
 			"revision": ""
@@ -258,6 +250,36 @@
 			"revision": ""
 		},
 		{
+			"checksumSHA1": "P5KyE9QEbAeHLeXzycSF/jS1FIc=",
+			"path": "github.com/hpcloud/tail",
+			"revision": "a1dbeea552b7c8df4b542c66073e393de198a800",
+			"revisionTime": "2018-05-14T19:44:41Z"
+		},
+		{
+			"checksumSHA1": "qn3/Y771JaGG94CvdKa8pIj5hH0=",
+			"path": "github.com/hpcloud/tail/ratelimiter",
+			"revision": "a1dbeea552b7c8df4b542c66073e393de198a800",
+			"revisionTime": "2018-05-14T19:44:41Z"
+		},
+		{
+			"checksumSHA1": "0xM336Lb25URO/1W1/CtGoRygVU=",
+			"path": "github.com/hpcloud/tail/util",
+			"revision": "a1dbeea552b7c8df4b542c66073e393de198a800",
+			"revisionTime": "2018-05-14T19:44:41Z"
+		},
+		{
+			"checksumSHA1": "FiJAmivBCwCbJCC3nPSgTgqGyfU=",
+			"path": "github.com/hpcloud/tail/watch",
+			"revision": "a1dbeea552b7c8df4b542c66073e393de198a800",
+			"revisionTime": "2018-05-14T19:44:41Z"
+		},
+		{
+			"checksumSHA1": "j65V4wnJboT4pfppNC/gjr2Gl+c=",
+			"path": "github.com/hpcloud/tail/winfile",
+			"revision": "a1dbeea552b7c8df4b542c66073e393de198a800",
+			"revisionTime": "2018-05-14T19:44:41Z"
+		},
+		{
 			"checksumSHA1": "6gvOcf79talRB+KoaRDfjT6YVeA=",
 			"path": "github.com/imdario/mergo",
 			"revision": ""
@@ -284,12 +306,18 @@
 			"revisionTime": "2019-01-08T01:23:27Z"
 		},
 		{
-			"checksumSHA1": "tvO7tKGqEGA3dLhcbCbIMIAq0y8=",
-			"path": "github.com/kubernetes-csi/drivers/pkg/csi-common",
-			"revision": "715fef99d38cc07ac5536f440cf6d7251b63ed7d",
-			"revisionTime": "2019-01-15T01:40:15Z",
-			"version": "v0.4.2",
-			"versionExact": "v0.4.2"
+			"checksumSHA1": "ZvwcyZUSxuTvSqzZg0CjyjTg3nw=",
+			"path": "github.com/kubernetes-csi/csi-test/pkg/sanity",
+			"revision": "4107c1c6c44089a96b2f8836242b91cf23947fdf",
+			"revisionTime": "2018-11-20T21:34:48Z",
+			"version": "v0.3.0-4",
+			"versionExact": "v0.3.0-4"
+		},
+		{
+			"checksumSHA1": "JZL2D53S5iaBUwg6hTQTabwYsdQ=",
+			"path": "github.com/kubernetes-csi/csi-test/utils",
+			"revision": "0caac94a2a318be3e391fa2bb508293e5b1d824a",
+			"revisionTime": "2019-01-25T10:45:34Z"
 		},
 		{
 			"checksumSHA1": "T8soMJArSZrYnhmdpAnq1bVxQ6Q=",
@@ -337,6 +365,12 @@
 			"path": "golang.org/x/net/context",
 			"revision": "c1e71bdcce6e89c8e4ce49f77ecb5e0a1962c716",
 			"revisionTime": "2018-12-07T02:23:57Z"
+		},
+		{
+			"checksumSHA1": "barUU39reQ7LdgYLA323hQ/UGy4=",
+			"path": "golang.org/x/net/html/charset",
+			"revision": "d26f9f9a57f3fab6a695bec0d84433c2c50f8bbf",
+			"revisionTime": "2018-09-25T13:55:50Z"
 		},
 		{
 			"checksumSHA1": "pCY4YtdNKVBYRbNvODjx8hj0hIs=",
@@ -394,6 +428,20 @@
 			"checksumSHA1": "Dfz4tGItokMvHZENCsBmPPB8FGQ=",
 			"path": "golang.org/x/sys/windows",
 			"revision": ""
+		},
+		{
+			"checksumSHA1": "SNdPthQa0ySEKhclVVapAx13LiM=",
+			"path": "golang.org/x/text/encoding",
+			"revision": "e6919f6577db79269a6443b9dc46d18f2238fb5d",
+			"revisionTime": "2018-12-15T12:10:58Z",
+			"tree": true
+		},
+		{
+			"checksumSHA1": "Qk7dljcrEK1BJkAEZguxAbG9dSo=",
+			"path": "golang.org/x/text/internal/utf8internal",
+			"revision": "e6919f6577db79269a6443b9dc46d18f2238fb5d",
+			"revisionTime": "2018-12-15T12:10:58Z",
+			"tree": true
 		},
 		{
 			"checksumSHA1": "CbpjEkkOeh0fdM/V8xKDdI0AA88=",
@@ -618,9 +666,21 @@
 			"revisionTime": "2018-12-07T02:23:57Z"
 		},
 		{
+			"checksumSHA1": "8Vjxiz2qAtkg3zjJgoXiDq7AI64=",
+			"path": "gopkg.in/fsnotify/fsnotify.v1",
+			"revision": "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9",
+			"revisionTime": "2018-01-10T05:33:47Z"
+		},
+		{
 			"checksumSHA1": "COfXAfInbcFT/YRsvLUQnNKHzF0=",
 			"path": "gopkg.in/inf.v0",
 			"revision": ""
+		},
+		{
+			"checksumSHA1": "TO8baX+t1Qs7EmOYth80MkbKzFo=",
+			"path": "gopkg.in/tomb.v1",
+			"revision": "dd632973f1e7218eb1089048e0798ec9ae7dceb8",
+			"revisionTime": "2014-10-24T13:56:13Z"
 		},
 		{
 			"checksumSHA1": "ZSWoOPUNRr5+3dhkLK3C4cZAQPk=",
