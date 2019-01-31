@@ -1,18 +1,12 @@
-package main
+package driver
 
 import (
 	glog "github.com/Sirupsen/logrus"
-	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/kubernetes-csi/drivers/pkg/csi-common"
+	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-type controllerServer struct {
-	client *Client
-	*csicommon.DefaultControllerServer
-}
 
 var (
 	supportedAccessMode = &csi.VolumeCapability_AccessMode{
@@ -21,7 +15,7 @@ var (
 	//newVolumes = map[string]*csi.Volume{}
 )
 
-func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	glog.Info("Start creating volume: ", req.GetParameters())
 
 	// check volume is created
@@ -43,27 +37,76 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		glog.Error("error get capacity from reqeust")
 		return nil, status.Errorf(codes.OutOfRange, "invalid capacity range")
 	}
-
-	return nil, nil
-}
-
-func (cs *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-	resp := &csi.ValidateVolumeCapabilitiesResponse{
-		Confirmed: &csi.ValidateVolumeCapabilitiesResponse_Confirmed{
-			VolumeCapabilities: []*csi.VolumeCapability{
-				{
-					AccessMode: supportedAccessMode,
-				},
-			},
-		},
-	}
+	resp := &csi.CreateVolumeResponse{}
 	return resp, nil
 }
 
-func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+	return nil, nil
+}
+
+func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+	glog.Info("ControllerUnpublishVolume called...")
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
-func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+	glog.Info("ControllerPublishVolume called...")
 	return &csi.ControllerPublishVolumeResponse{}, nil
+}
+
+func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
+	glog.Info("ValidateVolumeCapabilities called...")
+	resp := &csi.ValidateVolumeCapabilitiesResponse{}
+	return resp, nil
+}
+
+func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
+	return nil, nil
+}
+
+func (d *Driver) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
+	return nil, nil
+}
+
+func (d *Driver) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
+	return nil, nil
+}
+
+func (d *Driver) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
+	return nil, nil
+}
+
+func (d *Driver) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
+	return nil, nil
+}
+
+func (d *Driver) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
+	return nil, nil
+}
+
+func validateCapabilities(caps []*csi.VolumeCapability) bool {
+	vcaps := []*csi.VolumeCapability_AccessMode{supportedAccessMode}
+
+	hasSupport := func(mode csi.VolumeCapability_AccessMode_Mode) bool {
+		for _, m := range vcaps {
+			if mode == m.Mode {
+				return true
+			}
+		}
+		return false
+	}
+
+	supported := false
+	for _, cap := range caps {
+		if hasSupport(cap.AccessMode.Mode) {
+			supported = true
+		} else {
+			// we need to make sure all capabilities are supported. Revert back
+			// in case we have a cap that is supported, but is invalidated now
+			supported = false
+		}
+	}
+
+	return supported
 }

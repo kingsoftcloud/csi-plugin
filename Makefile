@@ -8,11 +8,11 @@ clean:
 
 .PHONY: compile
 compile:
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o csi-diskplugin ./driver
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o csi-diskplugin ./cmd/diskplugin
 
 .PHONY: build
 build:
-	docker build --network host -t csi-diskplugin:$(VERSION) -f Dockerfile .
+	docker build -t csi-diskplugin:$(VERSION) -f Dockerfile .
 
 .PHONY: push
 push:

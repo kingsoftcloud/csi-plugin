@@ -1,48 +1,58 @@
-package main
+package driver
 
 import (
+	"github.com/golang/glog"
 	//"encoding/json"
-	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/kubernetes-csi/drivers/pkg/csi-common"
+	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	k8sclient "k8s.io/client-go/kubernetes"
 	//"k8s.io/client-go/tools/clientcmd"
 )
 
-type nodeServer struct {
-	kscClient *Client
-	clientset *k8sclient.Clientset
-	*csicommon.DefaultNodeServer
-}
+func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+	glog.Info("NodeStageVolume called...")
 
-func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	return nil, nil
-}
-
-func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	return nil, nil
-}
-
-func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+func (d *Driver) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+	glog.Info("NodeUnstageVolume called...")
+
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (ns *nodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+	glog.Info("NodePublishVolume called...")
+	return nil, nil
+}
+
+func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+	glog.Info("NodeUnpublishVolume called...")
+
+	return nil, nil
+}
+
+func (d *Driver) NodeGetId(ctx context.Context, req *csi.NodeGetIdRequest) (*csi.NodeGetIdResponse, error) {
+	return nil, nil
+}
+
+func (d *Driver) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+	return nil, nil
+}
+
+func (d *Driver) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	glog.Info("NodeGetInfo called...")
+
 	return &csi.NodeGetInfoResponse{
-		NodeId:            *nodeid,
+		NodeId:            d.nodeID,
 		MaxVolumesPerNode: 3,
 
 		// make sure that the driver works on this particular region only
 		AccessibleTopology: &csi.Topology{
-			Segments: map[string]string{
-				"region": clusterinfo.Region,
-			},
+			// Segments: map[string]string{
+			// 	"region": d.clusterInfo.region,
+			// },
 		},
 	}, nil
 }
