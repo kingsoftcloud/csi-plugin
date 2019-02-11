@@ -2,11 +2,15 @@ package main
 
 import (
 	"csi-plugin/driver"
+	ebsClient "csi-plugin/pkg/ebs-client"
 	"encoding/json"
 	"flag"
 	"os"
+	"os/signal"
 
-	ebsClient "csi-plugin/pkg/ebs-client"
+	api "csi-plugin/pkg/open-api"
+
+	kecClient "csi-plugin/pkg/kec-client"
 
 	"github.com/golang/glog"
 	k8sclient "k8s.io/client-go/kubernetes"
@@ -55,8 +59,9 @@ func new_k8sclient() *k8sclient.Clientset {
 }
 
 type clusterInfo struct {
-	uuid   string `json:"cluster_uuid"`
-	region string `json:"region"`
+	accountId string `json:"user_id"`
+	uuid      string `json:"cluster_uuid"`
+	region    string `json:"region"`
 }
 
 func loadClusterInfo(clusterInfoPath string) *clusterInfo {
@@ -77,7 +82,7 @@ func loadClusterInfo(clusterInfoPath string) *clusterInfo {
 func getDriver() *driver.Driver {
 	ci := loadClusterInfo(*clusterInfoPath)
 
-	ebsClientConfig := &ebsClient.ClientConfig{
+	OpenApiConfig := &api.ClientConfig{
 		AccessKeyId:     *accessKeyId,
 		AccessKeySecret: *accessKeySecret,
 		OpenApiEndpoint: *openApiEndpoint,
@@ -91,9 +96,12 @@ func getDriver() *driver.Driver {
 		NodeID:     *nodeid,
 		Version:    version,
 		Region:     ci.region,
+		EbsClient:  ebsClient.New(OpenApiConfig),
+		KecClient:  kecClient.New(OpenApiConfig),
+		K8sclient:  new_k8sclient(),
 	}
 
-	return driver.NewDriver(driverConfig, ebsClient.New(ebsClientConfig), new_k8sclient())
+	return driver.NewDriver(driverConfig)
 }
 
 func main() {
@@ -101,6 +109,14 @@ func main() {
 	glog.Infof("CSI plugin, version: %s", version)
 
 	d := getDriver()
+
+	go func() {
+		c := make(chan os.Signal)
+		signal.Notify(c, os.Interrupt, os.Kill)
+		<-c
+		d.Stop()
+	}()
+
 	if err := d.Run(); err != nil {
 		glog.Fatal(err)
 	}

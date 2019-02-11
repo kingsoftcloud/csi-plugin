@@ -2,6 +2,7 @@ package driver
 
 import (
 	ebsClient "csi-plugin/pkg/ebs-client"
+	kecClient "csi-plugin/pkg/kec-client"
 	"fmt"
 	"net"
 	"os"
@@ -26,6 +27,8 @@ type Driver struct {
 	region   string
 
 	ebsClient ebsClient.StorageService
+	kecClient kecClient.KecService
+	mounter   Mounter
 	k8sclient *k8sclient.Clientset
 	srv       *grpc.Server
 
@@ -39,9 +42,12 @@ type DriverConfig struct {
 	NodeID     string
 	Version    string
 	Region     string
+	EbsClient  ebsClient.StorageService
+	KecClient  kecClient.KecService
+	K8sclient  *k8sclient.Clientset
 }
 
-func NewDriver(config *DriverConfig, ebsClient ebsClient.StorageService, k8sclient *k8sclient.Clientset) *Driver {
+func NewDriver(config *DriverConfig) *Driver {
 	if config.DriverName == "" {
 		glog.Errorf("Driver name missing")
 		return nil
@@ -63,8 +69,10 @@ func NewDriver(config *DriverConfig, ebsClient ebsClient.StorageService, k8sclie
 		version:   config.Version,
 		endpoint:  config.EndPoint,
 		region:    config.Region,
-		ebsClient: ebsClient,
-		k8sclient: k8sclient,
+		ebsClient: config.EbsClient,
+		kecClient: config.KecClient,
+		k8sclient: config.K8sclient,
+		mounter:   newMounter(),
 	}
 }
 

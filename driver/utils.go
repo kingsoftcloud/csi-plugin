@@ -4,13 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/golang/glog"
 
 	ebsClient "csi-plugin/pkg/ebs-client"
-
-	"context"
 
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 )
@@ -155,40 +150,6 @@ func formatBytes(inputBytes int64) string {
 	result := strconv.FormatFloat(output, 'f', 1, 64)
 	result = strings.TrimSuffix(result, ".0")
 	return result + unit
-}
-
-func waitVolumeStatus(storageService ebsClient.StorageService, volumeId string, targetStatus ebsClient.VolumeStatusType) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			listVolumesReq := &ebsClient.ListVolumesReq{
-				VolumeIds: []string{volumeId},
-			}
-			listVolumesResp, err := storageService.ListVolumes(listVolumesReq)
-			if err != nil {
-				glog.Errorf("waitVolumeStatus:ListVolumes %v error: %v", volumeId, err)
-				continue
-			}
-			if len(listVolumesResp.Volumes) == 0 {
-				glog.Errorf("waitVolumeStatus:ListVolumes error: volume %v not found", volumeId)
-				continue
-			}
-			vol := listVolumesResp.Volumes[0]
-			if vol.VolumeStatus == targetStatus {
-				return nil
-			}
-			glog.Infof("wating for volume status: %v, but current status: %v", targetStatus, vol.VolumeStatus)
-		case <-ctx.Done():
-			return fmt.Errorf("timeout occured waiting for storage action of volume: %q", volumeId)
-		}
-
-	}
 }
 
 type SuperMapString map[string]string

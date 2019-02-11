@@ -576,7 +576,7 @@ var _ = DescribeSanity("Controller Service", func(sc *SanityContext) {
 		})
 	})
 
-	Describe("ValidateVolumeCapabilities", func() {
+	FDescribe("ValidateVolumeCapabilities", func() {
 		It("should fail when no volume id is provided", func() {
 
 			_, err := c.ValidateVolumeCapabilities(
@@ -692,7 +692,7 @@ var _ = DescribeSanity("Controller Service", func(sc *SanityContext) {
 		})
 	})
 
-	Describe("ControllerPublishVolume", func() {
+	FDescribe("ControllerPublishVolume", func() {
 		BeforeEach(func() {
 			if !isControllerCapabilitySupported(c, csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME) {
 				Skip("ControllerPublishVolume not supported")
@@ -1032,7 +1032,7 @@ var _ = DescribeSanity("Controller Service", func(sc *SanityContext) {
 		})
 	})
 
-	Describe("ControllerUnpublishVolume", func() {
+	FDescribe("ControllerUnpublishVolume", func() {
 		BeforeEach(func() {
 			if !isControllerCapabilitySupported(c, csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME) {
 				Skip("ControllerUnpublishVolume not supported")

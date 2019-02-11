@@ -43,7 +43,7 @@ const (
 	CREATING_STATUS  VolumeStatusType = "creating"
 	AVAILABLE_STATUS VolumeStatusType = "available"
 	ATTACHING_STATUS VolumeStatusType = "attaching"
-	INUSE_STATUS     VolumeStatusType = "inuse"
+	INUSE_STATUS     VolumeStatusType = "in-use"
 	DETACHING_STATUS VolumeStatusType = "detaching"
 	EXTENDING_STATUS VolumeStatusType = "extending"
 	DELETING_STATUS  VolumeStatusType = "deleting"
@@ -61,9 +61,9 @@ type Volume struct {
 	InstanceId         string           `json:"InstanceId"`
 	CreateTime         string           `json:"CreateTime"`
 	AvailabilityZone   string           `json:"AvailabilityZone"`
-	ProjectId          string           `json:"ProjectId"`
+	ProjectId          int              `json:"ProjectId"`
 	DeleteWithInstance bool             `json:"DeleteWithInstance"`
-	Attachments        []*Attachment    `json:"Attachments"`
+	Attachments        []*Attachment    `json:"Attachment"`
 }
 
 type Attachment struct {
@@ -167,7 +167,7 @@ func (lv *ListVolumesReq) ToQuery() string {
 	querySlice := []string{"Action=DescribeVolumes"}
 	if lv.VolumeIds != nil && len(lv.VolumeIds) > 0 {
 		for i, VolumeId := range lv.VolumeIds {
-			querySlice = append(querySlice, fmt.Sprintf("VolumeId.%v=%v", i, VolumeId))
+			querySlice = append(querySlice, fmt.Sprintf("VolumeId.%v=%v", i+1, VolumeId))
 		}
 	}
 	for _, volumeCategory := range []string{DATA_VOlUME_CATE, SYSTEM_VOlUME_CATE} {

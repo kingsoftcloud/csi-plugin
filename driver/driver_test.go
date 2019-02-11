@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	ebsClient "csi-plugin/pkg/ebs-client"
+	kecClient "csi-plugin/pkg/kec-client"
 
 	"github.com/kubernetes-csi/csi-test/pkg/sanity"
 )
@@ -40,10 +42,16 @@ func getDriver(t *testing.T) *Driver {
 		NodeID:     nodeID,
 		Version:    version,
 		Region:     region,
+		EbsClient:  NewFakeStorageClient(),
+		KecClient:  NewFakeKecClient(),
 	}
 
-	return NewDriver(driverConfig, NewFakeStorageClient(), nil)
+	d := NewDriver(driverConfig)
+	d.mounter = NewFakeMounter()
+
+	return d
 }
+
 func TestDriverSuite(t *testing.T) {
 	d := getDriver(t)
 	go d.Run()
@@ -96,7 +104,12 @@ func (f *FakeStorageClient) ListVolumes(listVolumesReq *ebsClient.ListVolumesReq
 }
 
 func (f *FakeStorageClient) GetVolume(listVolumesReq *ebsClient.ListVolumesReq) (*ebsClient.Volume, error) {
-	return nil, nil
+	vol, ok := f.volumes[listVolumesReq.VolumeIds[0]]
+	if !ok {
+		return nil, errors.New("volume not found")
+	}
+
+	return vol, nil
 }
 
 func (f *FakeStorageClient) CreateVolume(createVolumeReq *ebsClient.CreateVolumeReq) (*ebsClient.CreateVolumeResp, error) {
@@ -111,6 +124,7 @@ func (f *FakeStorageClient) CreateVolume(createVolumeReq *ebsClient.CreateVolume
 		VolumeName:       createVolumeReq.VolumeName,
 		VolumeDesc:       createVolumeReq.VolumeDesc,
 		Size:             createVolumeReq.Size,
+		VolumeStatus:     ebsClient.AVAILABLE_STATUS,
 	}
 	f.volumes[id] = vol
 
@@ -126,11 +140,31 @@ func (f *FakeStorageClient) DeleteVolume(deleteVolumeReq *ebsClient.DeleteVolume
 }
 
 func (f *FakeStorageClient) Attach(attachVolumeReq *ebsClient.AttachVolumeReq) (*ebsClient.AttachVolumeResp, error) {
-	return nil, nil
+	vol, ok := f.volumes[attachVolumeReq.VolumeId]
+	if !ok {
+		return nil, fmt.Errorf("vol %v not found", attachVolumeReq.VolumeId)
+	}
+	vol.VolumeStatus = ebsClient.INUSE_STATUS
+	f.volumes[vol.VolumeId] = vol
+
+	return &ebsClient.AttachVolumeResp{
+		RequestId: randString(10),
+		Return:    true,
+	}, nil
 }
 
 func (f *FakeStorageClient) Detach(detachVolumeReq *ebsClient.DetachVolumeReq) (*ebsClient.DetachVolumeResp, error) {
-	return nil, nil
+	vol, ok := f.volumes[detachVolumeReq.VolumeId]
+	if !ok {
+		return nil, fmt.Errorf("vol %v not found", detachVolumeReq.VolumeId)
+	}
+	vol.VolumeStatus = ebsClient.AVAILABLE_STATUS
+	f.volumes[vol.VolumeId] = vol
+
+	return &ebsClient.DetachVolumeResp{
+		RequestId: "",
+		Return:    true,
+	}, nil
 }
 
 func randString(n int) string {
@@ -140,4 +174,51 @@ func randString(n int) string {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
 	return string(b)
+}
+
+type FakeKecClient struct {
+	nodes map[string]*kecClient.KecInfo
+}
+
+func NewFakeKecClient() *FakeKecClient {
+	return &FakeKecClient{
+		nodes: map[string]*kecClient.KecInfo{
+			"test-node": &kecClient.KecInfo{
+				InstanceId: "test-node",
+			},
+		},
+	}
+}
+
+func (fk FakeKecClient) DescribeInstances(instance_id string) (*kecClient.KecInfo, error) {
+	node, ok := fk.nodes[instance_id]
+	if !ok {
+		return nil, errors.New("node not found")
+	}
+	return node, nil
+}
+
+type fakeMounter struct{}
+
+func NewFakeMounter() *fakeMounter {
+	return &fakeMounter{}
+}
+
+func (f *fakeMounter) Format(source string, fsType string) error {
+	return nil
+}
+
+func (f *fakeMounter) Mount(source string, target string, fsType string, options ...string) error {
+	return nil
+}
+
+func (f *fakeMounter) Unmount(target string) error {
+	return nil
+}
+
+func (f *fakeMounter) IsFormatted(source string) (bool, error) {
+	return true, nil
+}
+func (f *fakeMounter) IsMounted(target string) (bool, error) {
+	return true, nil
 }
