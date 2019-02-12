@@ -96,7 +96,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	volumeType := parameters.Get("volume_type", defaultVolumeType)
 
 	createVolumeReq := &ebsClient.CreateVolumeReq{
-		AvailabilityZone: d.region,
+		AvailabilityZone: d.availabilityZone,
 		VolumeName:       volumeName,
 		VolumeDesc:       createdByDO,
 		Size:             size / GB,

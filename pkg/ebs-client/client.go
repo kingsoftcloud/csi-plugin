@@ -185,7 +185,7 @@ func ValidateCreateVolumeReq(req *CreateVolumeReq) error {
 		return status.Errorf(codes.InvalidArgument, "Volume desc (%v) is invalid", req.VolumeDesc)
 	}
 	if !validateReqParams(AvailabilityZoneRegexp, req.AvailabilityZone) {
-		return status.Errorf(codes.InvalidArgument, "Region (%v) is invalid", req.AvailabilityZone)
+		return status.Errorf(codes.InvalidArgument, "AvailabilityZone (%v) is invalid", req.AvailabilityZone)
 	}
 	if !validateReqParams(ChargeTypeRegexp, req.ChargeType) {
 		return status.Errorf(codes.InvalidArgument, "ChargeType (%v) is invalid", req.ChargeType)

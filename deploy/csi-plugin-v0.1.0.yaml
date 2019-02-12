@@ -83,6 +83,10 @@ spec:
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(NODE_ID)"
+            - "--access-key-id=AKLTd3j9wnDnSamjGtU4Ngj8og"
+            - "--access-key-secret=ON9XNwu+DFCOhbmABbCQmVm9eldy8EkeOKw0lIKH462fkDPb5jBvUGw67vW5aaSHhw=="
+            # - "--access-key-id=$(ACCESS_KEY_ID)"
+            # - "--access-key-secret=$(ACCESS_KEY_SECRET)"
             - "--v=5"
             - "--alsologtostderr=true"
           env:
@@ -92,6 +96,16 @@ spec:
                   fieldPath: spec.nodeName
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+            - name: ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ksc-secret
+                  key: access-key-id
+            - name: ACCESS_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ksc-secret
+                  key: access-key-secret
           imagePullPolicy: "Always"
           volumeMounts:
             - name: socket-dir
@@ -239,6 +253,10 @@ spec:
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(NODE_ID)"
+            # - "--access-key-id=$(ACCESS_KEY_ID)"
+            # - "--access-key-secret=$(ACCESS_KEY_SECRET)"
+            - "--access-key-id=AKLTd3j9wnDnSamjGtU4Ngj8og"
+            - "--access-key-secret=ON9XNwu+DFCOhbmABbCQmVm9eldy8EkeOKw0lIKH462fkDPb5jBvUGw67vW5aaSHhw=="
             - "--v=5"
             - "--alsologtostderr=true"
           env:
@@ -248,6 +266,16 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ksc-secret
+                  key: access-key-id
+            - name: ACCESS_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ksc-secret
+                  key: access-key-secret
           imagePullPolicy: "Always"
           securityContext:
             privileged: true

@@ -20,11 +20,13 @@ import (
 )
 
 type Driver struct {
-	name     string
-	nodeID   string
-	version  string
-	endpoint string
-	region   string
+	name             string
+	nodeID           string
+	instanceUUID     string
+	version          string
+	endpoint         string
+	region           string
+	availabilityZone string
 
 	ebsClient ebsClient.StorageService
 	kecClient kecClient.KecService
@@ -37,14 +39,16 @@ type Driver struct {
 }
 
 type DriverConfig struct {
-	EndPoint   string
-	DriverName string
-	NodeID     string
-	Version    string
-	Region     string
-	EbsClient  ebsClient.StorageService
-	KecClient  kecClient.KecService
-	K8sclient  *k8sclient.Clientset
+	EndPoint         string
+	DriverName       string
+	NodeID           string
+	InstanceUUID     string
+	Version          string
+	Region           string
+	AvailabilityZone string
+	EbsClient        ebsClient.StorageService
+	KecClient        kecClient.KecService
+	K8sclient        *k8sclient.Clientset
 }
 
 func NewDriver(config *DriverConfig) *Driver {
@@ -64,15 +68,16 @@ func NewDriver(config *DriverConfig) *Driver {
 	}
 
 	return &Driver{
-		name:      config.DriverName,
-		nodeID:    config.NodeID,
-		version:   config.Version,
-		endpoint:  config.EndPoint,
-		region:    config.Region,
-		ebsClient: config.EbsClient,
-		kecClient: config.KecClient,
-		k8sclient: config.K8sclient,
-		mounter:   newMounter(),
+		name:             config.DriverName,
+		nodeID:           config.NodeID,
+		version:          config.Version,
+		endpoint:         config.EndPoint,
+		region:           config.Region,
+		availabilityZone: config.AvailabilityZone,
+		ebsClient:        config.EbsClient,
+		kecClient:        config.KecClient,
+		k8sclient:        config.K8sclient,
+		mounter:          newMounter(),
 	}
 }
 

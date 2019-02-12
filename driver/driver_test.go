@@ -23,12 +23,13 @@ func init() {
 }
 
 var (
-	socket     = "/tmp/csi.sock"
-	endpoint   = "unix://" + socket
-	driverName = "com.ksc.csi.diskplugin"
-	nodeID     = "test-node"
-	version    = "0.1"
-	region     = "test-region"
+	socket           = "/tmp/csi.sock"
+	endpoint         = "unix://" + socket
+	driverName       = "com.ksc.csi.diskplugin"
+	nodeID           = "test-node"
+	version          = "0.1"
+	region           = "test-region"
+	availabilityZone = "test-availabilityzone"
 )
 
 func getDriver(t *testing.T) *Driver {
@@ -37,13 +38,14 @@ func getDriver(t *testing.T) *Driver {
 	}
 
 	driverConfig := &DriverConfig{
-		EndPoint:   endpoint,
-		DriverName: driverName,
-		NodeID:     nodeID,
-		Version:    version,
-		Region:     region,
-		EbsClient:  NewFakeStorageClient(),
-		KecClient:  NewFakeKecClient(),
+		EndPoint:         endpoint,
+		DriverName:       driverName,
+		NodeID:           nodeID,
+		Version:          version,
+		Region:           region,
+		AvailabilityZone: availabilityZone,
+		EbsClient:        NewFakeStorageClient(),
+		KecClient:        NewFakeKecClient(),
 	}
 
 	d := NewDriver(driverConfig)

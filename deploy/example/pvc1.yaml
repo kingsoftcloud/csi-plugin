@@ -4,8 +4,8 @@ metadata:
   name: pv1 
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   storageClassName: test-csi-provisioner 
   resources:
     requests:
-      storage: 1Mi
+      storage: 10Gi

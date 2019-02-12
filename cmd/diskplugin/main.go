@@ -7,12 +7,14 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"strings"
 
 	api "csi-plugin/pkg/open-api"
 
 	kecClient "csi-plugin/pkg/kec-client"
 
 	"github.com/golang/glog"
+	"github.com/zwei/appclient/pkg/util/node"
 	k8sclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -58,14 +60,14 @@ func new_k8sclient() *k8sclient.Clientset {
 	return clientset
 }
 
-type clusterInfo struct {
-	accountId string `json:"user_id"`
-	uuid      string `json:"cluster_uuid"`
-	region    string `json:"region"`
+type ClusterInfo struct {
+	AccountID int64  `json:"user_id"`
+	UUID      string `json:"cluster_uuid"`
+	Region    string `json:"region"`
 }
 
-func loadClusterInfo(clusterInfoPath string) *clusterInfo {
-	clusterInfo := &clusterInfo{}
+func loadClusterInfo(clusterInfoPath string) *ClusterInfo {
+	clusterInfo := &ClusterInfo{}
 	file, err := os.Open(clusterInfoPath)
 	if err != nil {
 		glog.Error("Failed to read clusterinfo: ", err)
@@ -77,28 +79,46 @@ func loadClusterInfo(clusterInfoPath string) *clusterInfo {
 		return nil
 	}
 	return clusterInfo
+
 }
 
 func getDriver() *driver.Driver {
 	ci := loadClusterInfo(*clusterInfoPath)
+	glog.Infof("cluster info: %v", ci)
 
 	OpenApiConfig := &api.ClientConfig{
-		AccessKeyId:     *accessKeyId,
-		AccessKeySecret: *accessKeySecret,
+		AccessKeyId:     strings.TrimSpace(*accessKeyId),
+		AccessKeySecret: strings.TrimSpace(*accessKeySecret),
 		OpenApiEndpoint: *openApiEndpoint,
 		OpenApiPrefix:   *openApiSchema,
-		Region:          ci.region,
+		Region:          ci.Region,
 	}
+	glog.Infof("open api config: %v", OpenApiConfig)
+
+	// get node instance_uuid
+	instanceUUID, err := node.GetSystemUUID()
+	if err != nil {
+		panic(err)
+	}
+	// get node AvailabilityZone
+	kecCli := kecClient.New(OpenApiConfig)
+	kecInfo, err := kecCli.DescribeInstances(instanceUUID)
+	if err != nil {
+		panic(err)
+	}
+	glog.Infof("kecInfo: %v", kecInfo)
 
 	driverConfig := &driver.DriverConfig{
-		EndPoint:   *endpoint,
-		DriverName: driverName,
-		NodeID:     *nodeid,
-		Version:    version,
-		Region:     ci.region,
-		EbsClient:  ebsClient.New(OpenApiConfig),
-		KecClient:  kecClient.New(OpenApiConfig),
-		K8sclient:  new_k8sclient(),
+		EndPoint:         *endpoint,
+		DriverName:       driverName,
+		NodeID:           *nodeid,
+		InstanceUUID:     instanceUUID,
+		Version:          version,
+		Region:           ci.Region,
+		AvailabilityZone: kecInfo.AvailabilityZone,
+		EbsClient:        ebsClient.New(OpenApiConfig),
+		KecClient:        kecClient.New(OpenApiConfig),
+		K8sclient:        new_k8sclient(),
 	}
 
 	return driver.NewDriver(driverConfig)
