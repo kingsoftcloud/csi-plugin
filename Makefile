@@ -21,3 +21,11 @@ push:
 	docker tag csi-diskplugin:$(VERSION) registry.cn-beijing.aliyuncs.com/hsxue/csi-diskplugin:$(VERSION)
 	docker push registry.cn-beijing.aliyuncs.com/hsxue/csi-diskplugin:$(VERSION) 
 
+.PHONY: deploy_v0.1.0
+deploy_v0.1.0:
+	kubectl create -f deploy/ksc-secret.yaml
+	kubectl apply -f deploy/csi-plugin-v0.1.0.yaml
+
+.PHONY: test
+test:
+	go test --cover ./...

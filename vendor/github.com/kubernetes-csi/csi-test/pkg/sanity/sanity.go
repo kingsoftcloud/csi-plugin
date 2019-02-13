@@ -70,7 +70,6 @@ func Test(t *testing.T, reqConfig *Config) {
 	sc := &SanityContext{
 		Config: reqConfig,
 	}
-
 	registerTestsInGinkgo(sc)
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "CSI Driver Test Suite")

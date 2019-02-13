@@ -17,8 +17,6 @@ limitations under the License.
 package sanity
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo"
 )
 
@@ -43,7 +41,6 @@ func DescribeSanity(text string, body func(*SanityContext)) bool {
 // for the tests registered earlier with DescribeSanity.
 func registerTestsInGinkgo(sc *SanityContext) {
 	for _, test := range tests {
-		fmt.Println(test.text)
 		Describe(test.text, func() {
 			BeforeEach(func() {
 				sc.setup()

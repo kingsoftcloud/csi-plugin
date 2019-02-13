@@ -21,10 +21,9 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -39,7 +38,7 @@ var _ = DescribeSanity("Identity Service", func(sc *SanityContext) {
 		c = csi.NewIdentityClient(sc.Conn)
 	})
 
-	FDescribe("GetPluginCapabilities", func() {
+	Describe("GetPluginCapabilities", func() {
 		It("should return appropriate capabilities", func() {
 			req := &csi.GetPluginCapabilitiesRequest{}
 			res, err := c.GetPluginCapabilities(context.Background(), req)
@@ -61,7 +60,7 @@ var _ = DescribeSanity("Identity Service", func(sc *SanityContext) {
 
 	})
 
-	FDescribe("Probe", func() {
+	Describe("Probe", func() {
 		It("should return appropriate information", func() {
 			req := &csi.ProbeRequest{}
 			res, err := c.Probe(context.Background(), req)
@@ -81,7 +80,7 @@ var _ = DescribeSanity("Identity Service", func(sc *SanityContext) {
 		})
 	})
 
-	FDescribe("GetPluginInfo", func() {
+	Describe("GetPluginInfo", func() {
 		It("should return appropriate information", func() {
 			req := &csi.GetPluginInfoRequest{}
 			res, err := c.GetPluginInfo(context.Background(), req)

@@ -20,10 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -103,7 +102,7 @@ var _ = DescribeSanity("Node Service", func(sc *SanityContext) {
 		cl.DeleteVolumes()
 	})
 
-	FDescribe("NodeGetCapabilities", func() {
+	Describe("NodeGetCapabilities", func() {
 		It("should return appropriate capabilities", func() {
 			caps, err := c.NodeGetCapabilities(
 				context.Background(),
@@ -138,7 +137,7 @@ var _ = DescribeSanity("Node Service", func(sc *SanityContext) {
 		})
 	})
 
-	FDescribe("NodeGetInfo", func() {
+	Describe("NodeGetInfo", func() {
 		var (
 			i                                csi.IdentityClient
 			accessibilityConstraintSupported bool
@@ -165,7 +164,7 @@ var _ = DescribeSanity("Node Service", func(sc *SanityContext) {
 		})
 	})
 
-	FDescribe("NodePublishVolume", func() {
+	Describe("NodePublishVolume", func() {
 		It("should fail when no volume id is provided", func() {
 			_, err := c.NodePublishVolume(
 				context.Background(),
@@ -212,7 +211,7 @@ var _ = DescribeSanity("Node Service", func(sc *SanityContext) {
 		})
 	})
 
-	FDescribe("NodeUnpublishVolume", func() {
+	Describe("NodeUnpublishVolume", func() {
 		It("should fail when no volume id is provided", func() {
 
 			_, err := c.NodeUnpublishVolume(
@@ -240,7 +239,7 @@ var _ = DescribeSanity("Node Service", func(sc *SanityContext) {
 		})
 	})
 
-	FDescribe("NodeStageVolume", func() {
+	Describe("NodeStageVolume", func() {
 		var (
 			device string
 		)
@@ -325,7 +324,7 @@ var _ = DescribeSanity("Node Service", func(sc *SanityContext) {
 		})
 	})
 
-	FDescribe("NodeUnstageVolume", func() {
+	Describe("NodeUnstageVolume", func() {
 		BeforeEach(func() {
 			if !nodeStageSupported {
 				Skip("NodeUnstageVolume not supported")
@@ -361,7 +360,7 @@ var _ = DescribeSanity("Node Service", func(sc *SanityContext) {
 		})
 	})
 
-	FIt("should work", func() {
+	It("should work", func() {
 		name := uniqueString("sanity-node-full")
 
 		// Create Volume First

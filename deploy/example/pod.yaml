@@ -7,11 +7,11 @@ spec:
    - name: web-server
      image: nginx 
      volumeMounts:
-       - mountPath: /var/lib/www/html
+       - mountPath: /usr/share/nginx/html
          name: mypvc
   volumes:
    - name: mypvc
      persistentVolumeClaim:
-       claimName: pv2
+       claimName: pv1
        readOnly: false
 

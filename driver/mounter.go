@@ -166,12 +166,7 @@ func (m *mounter) IsFormatted(source string) (bool, error) {
 	blkidArgs := []string{source}
 
 	glog.Infof("checking if source is formatted, cmd: %v, args: %v", blkidCmd, blkidArgs)
-	out, err := exec.Command(blkidCmd, blkidArgs...).CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("checking formatting failed: %v cmd: %q output: %q",
-			err, blkidCmd, string(out))
-	}
-
+	out, _ := exec.Command(blkidCmd, blkidArgs...).CombinedOutput()
 	if strings.TrimSpace(string(out)) == "" {
 		return false, nil
 	}

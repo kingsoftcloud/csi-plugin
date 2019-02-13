@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	diskIDPath   = "/dev/disk/by-id"
-	diskDOPrefix = "scsi-0DO_Volume_"
+	diskIDPath = "/dev/disk/by-id"
+	diskPrefix = "virtio-"
 )
 
 func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
@@ -30,14 +30,12 @@ func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRe
 	if req.VolumeCapability == nil {
 		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume Capability must be provided")
 	}
-	volumeName := ""
-	if volName, ok := req.GetPublishInfo()[publishInfoVolumeName]; !ok {
+
+	if _, ok := req.GetPublishInfo()[publishInfoVolumeName]; !ok {
 		return nil, status.Error(codes.InvalidArgument, "Could not find the volume by name")
-	} else {
-		volumeName = volName
 	}
 
-	source := getDiskSource(volumeName)
+	source := getDiskSource(req.VolumeId)
 	target := req.StagingTargetPath
 
 	mnt := req.VolumeCapability.GetMount()
@@ -231,6 +229,6 @@ func (d *Driver) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (
 
 // getDiskSource returns the absolute path of the attached volume for the given
 // DO volume name
-func getDiskSource(volumeName string) string {
-	return filepath.Join(diskIDPath, diskDOPrefix+volumeName)
+func getDiskSource(volumeId string) string {
+	return filepath.Join(diskIDPath, diskPrefix+volumeId[0:20])
 }

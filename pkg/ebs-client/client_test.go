@@ -113,12 +113,14 @@ var _ = Describe("EbcClient", func() {
 		})
 
 		It("should success create volume", func() {
+			volumeName := "test-" + randString(8)
 			req := &CreateVolumeReq{
-				VolumeName:       "test-volume1",
+				VolumeName:       volumeName,
 				VolumeType:       "SSD3.0",
 				Size:             10,
 				AvailabilityZone: "cn-beijing-6a",
-				ChargeType:       "HourlyInstantSettlement",
+				ChargeType:       "Daily",
+				PurchaseTime:     1,
 			}
 			resp, err := client.CreateVolume(req)
 
@@ -139,3 +141,12 @@ var _ = Describe("EbcClient", func() {
 		})
 	})
 })
+
+func randString(n int) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}

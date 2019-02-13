@@ -13,8 +13,10 @@ import (
 
 	kecClient "csi-plugin/pkg/kec-client"
 
+	"csi-plugin/util"
+
 	"github.com/golang/glog"
-	"github.com/zwei/appclient/pkg/util/node"
+
 	k8sclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -27,7 +29,6 @@ const (
 
 var (
 	endpoint   = flag.String("endpoint", "unix://tmp/csi.sock", "CSI endpoint")
-	nodeid     = flag.String("nodeid", "", "Node ID")
 	master     = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
 	kubeconfig = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
 
@@ -96,7 +97,7 @@ func getDriver() *driver.Driver {
 	glog.Infof("open api config: %v", OpenApiConfig)
 
 	// get node instance_uuid
-	instanceUUID, err := node.GetSystemUUID()
+	instanceUUID, err := util.GetSystemUUID()
 	if err != nil {
 		panic(err)
 	}
@@ -111,8 +112,7 @@ func getDriver() *driver.Driver {
 	driverConfig := &driver.DriverConfig{
 		EndPoint:         *endpoint,
 		DriverName:       driverName,
-		NodeID:           *nodeid,
-		InstanceUUID:     instanceUUID,
+		NodeID:           instanceUUID,
 		Version:          version,
 		Region:           ci.Region,
 		AvailabilityZone: kecInfo.AvailabilityZone,
@@ -129,7 +129,6 @@ func main() {
 	glog.Infof("CSI plugin, version: %s", version)
 
 	d := getDriver()
-
 	go func() {
 		c := make(chan os.Signal)
 		signal.Notify(c, os.Interrupt, os.Kill)

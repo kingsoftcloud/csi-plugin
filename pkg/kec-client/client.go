@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 
 	"github.com/golang/glog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -22,7 +24,10 @@ func New(config *api.ClientConfig) *Client {
 }
 
 func (cli *Client) DescribeInstances(instance_id string) (*KecInfo, error) {
-	query := "Action=DescribeInstances&Version=2016-03-04&InstanceId.1=" + instance_id
+	if instance_id == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "instance_id (%v) is invalid", instance_id)
+	}
+	query := "Action=DescribeInstances&InstanceId.1=" + instance_id
 	resp, err := cli.DoRequest(serviceName, query)
 	if err != nil {
 		return nil, err

@@ -99,7 +99,7 @@ func (f *FakeStorageClient) ListVolumes(listVolumesReq *ebsClient.ListVolumesReq
 		volumes = append(volumes, volume)
 	}
 	listVolumesResp := &ebsClient.ListVolumesResp{
-		RequestId: randString(10),
+		RequestId: randString(32),
 		Volumes:   volumes,
 	}
 	return listVolumesResp, nil
@@ -115,11 +115,11 @@ func (f *FakeStorageClient) GetVolume(listVolumesReq *ebsClient.ListVolumesReq) 
 }
 
 func (f *FakeStorageClient) CreateVolume(createVolumeReq *ebsClient.CreateVolumeReq) (*ebsClient.CreateVolumeResp, error) {
-	if err := ebsClient.ValidateCreateVolumeReq(createVolumeReq); err != nil {
-		return nil, err
-	}
+	// if err := ebsClient.ValidateCreateVolumeReq(createVolumeReq); err != nil {
+	// 	return nil, err
+	// }
 
-	id := randString(10)
+	id := randString(32)
 	vol := &ebsClient.Volume{
 		VolumeId:         id,
 		AvailabilityZone: createVolumeReq.AvailabilityZone,
@@ -131,7 +131,7 @@ func (f *FakeStorageClient) CreateVolume(createVolumeReq *ebsClient.CreateVolume
 	f.volumes[id] = vol
 
 	return &ebsClient.CreateVolumeResp{
-		RequestId: randString(10),
+		RequestId: randString(32),
 		VolumeId:  vol.VolumeId,
 	}, nil
 }
@@ -150,7 +150,7 @@ func (f *FakeStorageClient) Attach(attachVolumeReq *ebsClient.AttachVolumeReq) (
 	f.volumes[vol.VolumeId] = vol
 
 	return &ebsClient.AttachVolumeResp{
-		RequestId: randString(10),
+		RequestId: randString(32),
 		Return:    true,
 	}, nil
 }

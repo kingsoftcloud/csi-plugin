@@ -22,7 +22,6 @@ import (
 type Driver struct {
 	name             string
 	nodeID           string
-	instanceUUID     string
 	version          string
 	endpoint         string
 	region           string
@@ -42,7 +41,6 @@ type DriverConfig struct {
 	EndPoint         string
 	DriverName       string
 	NodeID           string
-	InstanceUUID     string
 	Version          string
 	Region           string
 	AvailabilityZone string

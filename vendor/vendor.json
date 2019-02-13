@@ -355,13 +355,6 @@
 			"revision": ""
 		},
 		{
-			"checksumSHA1": "NwpNTHm7uxtu6wNspNY0TDyV+68=",
-			"path": "github.com/zwei/appclient",
-			"revision": "dd95bded8a978f372b23c7c2d3e08664c9deb610",
-			"revisionTime": "2019-01-29T12:25:18Z",
-			"tree": true
-		},
-		{
 			"checksumSHA1": "BGm8lKZmvJbf/YOJLeL1rw2WVjA=",
 			"path": "golang.org/x/crypto/ssh/terminal",
 			"revision": ""
