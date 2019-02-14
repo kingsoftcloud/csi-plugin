@@ -169,6 +169,13 @@ func (f *FakeStorageClient) Detach(detachVolumeReq *ebsClient.DetachVolumeReq) (
 	}, nil
 }
 
+func (f *FakeStorageClient) ValidateAttachInstance(req *ebsClient.ValidateAttachInstanceReq) (*ebsClient.ValidateAttachInstanceResp, error) {
+	return &ebsClient.ValidateAttachInstanceResp{
+		RequestId:      randString(36),
+		InstanceEnable: true,
+	}, nil
+}
+
 func randString(n int) string {
 	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	b := make([]byte, n)

@@ -29,100 +29,100 @@
 #     storageclass.kubernetes.io/is-default-class: "true"
 # provisioner: com.ksc.csi.diskplugin
 
+# # ---
+
+# ####################################################
+# ###########                             ############
+# ###########  CSI Node and Driver CRDs   ############
+# ###########                             ############
+# ####################################################
+
+# apiVersion: apiextensions.k8s.io/v1beta1
+# kind: CustomResourceDefinition
+# metadata:
+#   creationTimestamp: null
+#   name: csinodeinfos.csi.storage.k8s.io
+# spec:
+#   group: csi.storage.k8s.io
+#   names:
+#     kind: CSINodeInfo
+#     plural: csinodeinfos
+#   scope: Cluster
+#   validation:
+#     openAPIV3Schema:
+#       properties:
+#         csiDrivers:
+#           description: List of CSI drivers running on the node and their properties.
+#           items:
+#             properties:
+#               driver:
+#                 description: The CSI driver that this object refers to.
+#                 type: string
+#               nodeID:
+#                 description: The node from the driver point of view.
+#                 type: string
+#               topologyKeys:
+#                 description: List of keys supported by the driver.
+#                 items:
+#                   type: string
+#                 type: array
+#           type: array
+#   version: v1alpha1
+# status:
+#   acceptedNames:
+#     kind: ""
+#     plural: ""
+#   conditions: []
+#   storedVersions: []
+
 # ---
 
-####################################################
-###########                             ############
-###########  CSI Node and Driver CRDs   ############
-###########                             ############
-####################################################
+# apiVersion: apiextensions.k8s.io/v1beta1
+# kind: CustomResourceDefinition
+# metadata:
+#   creationTimestamp: null
+#   name: csidrivers.csi.storage.k8s.io
+# spec:
+#   group: csi.storage.k8s.io
+#   names:
+#     kind: CSIDriver
+#     plural: csidrivers
+#   scope: Cluster
+#   validation:
+#     openAPIV3Schema:
+#       properties:
+#         spec:
+#           description: Specification of the CSI Driver.
+#           properties:
+#             attachRequired:
+#               description: Indicates this CSI volume driver requires an attach operation,
+#                 and that Kubernetes should call attach and wait for any attach operation
+#                 to complete before proceeding to mount.
+#               type: boolean
+#             podInfoOnMountVersion:
+#               description: Indicates this CSI volume driver requires additional pod
+#                 information (like podName, podUID, etc.) during mount operations.
+#               type: string
+#   version: v1alpha1
+# status:
+#   acceptedNames:
+#     kind: ""
+#     plural: ""
+#   conditions: []
+#   storedVersions: []
 
-apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  creationTimestamp: null
-  name: csinodeinfos.csi.storage.k8s.io
-spec:
-  group: csi.storage.k8s.io
-  names:
-    kind: CSINodeInfo
-    plural: csinodeinfos
-  scope: Cluster
-  validation:
-    openAPIV3Schema:
-      properties:
-        csiDrivers:
-          description: List of CSI drivers running on the node and their properties.
-          items:
-            properties:
-              driver:
-                description: The CSI driver that this object refers to.
-                type: string
-              nodeID:
-                description: The node from the driver point of view.
-                type: string
-              topologyKeys:
-                description: List of keys supported by the driver.
-                items:
-                  type: string
-                type: array
-          type: array
-  version: v1alpha1
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
+# ---
 
----
+# # CSIDriverRegistry feature gate needs to be enabled
+# apiVersion: csi.storage.k8s.io/v1alpha1
+# kind: CSIDriver
+# metadata:
+#   name: com.ksc.csi.diskplugin
+# spec:
+#   attachRequired: true
+#   podInfoOnMountVersion: "v1"
 
-apiVersion: apiextensions.k8s.io/v1beta1
-kind: CustomResourceDefinition
-metadata:
-  creationTimestamp: null
-  name: csidrivers.csi.storage.k8s.io
-spec:
-  group: csi.storage.k8s.io
-  names:
-    kind: CSIDriver
-    plural: csidrivers
-  scope: Cluster
-  validation:
-    openAPIV3Schema:
-      properties:
-        spec:
-          description: Specification of the CSI Driver.
-          properties:
-            attachRequired:
-              description: Indicates this CSI volume driver requires an attach operation,
-                and that Kubernetes should call attach and wait for any attach operation
-                to complete before proceeding to mount.
-              type: boolean
-            podInfoOnMountVersion:
-              description: Indicates this CSI volume driver requires additional pod
-                information (like podName, podUID, etc.) during mount operations.
-              type: string
-  version: v1alpha1
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
-
----
-
-# CSIDriverRegistry feature gate needs to be enabled
-apiVersion: csi.storage.k8s.io/v1alpha1
-kind: CSIDriver
-metadata:
-  name: com.ksc.csi.diskplugin
-spec:
-  attachRequired: true
-  podInfoOnMountVersion: "v1"
-
----
+# ---
 
 ##############################################
 ###########                       ############
@@ -250,7 +250,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-diskplugin
-          image: registry.cn-beijing.aliyuncs.com/hsxue/csi-diskplugin:v0.1.0
+          image: hub.kce.ksyun.com/hsxue/csi-diskplugin:v0.1.0
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--access-key-id=$(ACCESS_KEY_ID)"
@@ -313,12 +313,12 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
-  - apiGroups: ["snapshot.storage.k8s.io"]
-    resources: ["volumesnapshots"]
-    verbs: ["get", "list"]
-  - apiGroups: ["snapshot.storage.k8s.io"]
-    resources: ["volumesnapshotcontents"]
-    verbs: ["get", "list"]
+  # - apiGroups: ["snapshot.storage.k8s.io"]
+  #   resources: ["volumesnapshots"]
+  #   verbs: ["get", "list"]
+  # - apiGroups: ["snapshot.storage.k8s.io"]
+  #   resources: ["volumesnapshotcontents"]
+  #   verbs: ["get", "list"]
 
 ---
 
@@ -349,9 +349,9 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["get", "list", "watch"]
-  - apiGroups: ["csi.storage.k8s.io"]
-    resources: ["csinodeinfos"]
-    verbs: ["get", "list", "watch"]
+  # - apiGroups: ["csi.storage.k8s.io"]
+  #   resources: ["csinodeinfos"]
+  #   verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch", "update"]
@@ -422,7 +422,7 @@ spec:
             - name: registration-dir
               mountPath: /registration/
         - name: csi-diskplugin
-          image: registry.cn-beijing.aliyuncs.com/hsxue/csi-diskplugin:v0.1.0
+          image: hub.kce.ksyun.com/hsxue/csi-diskplugin:v0.1.0
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--access-key-id=$(ACCESS_KEY_ID)"

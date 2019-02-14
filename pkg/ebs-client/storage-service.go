@@ -13,6 +13,8 @@ type StorageService interface {
 
 	Attach(*AttachVolumeReq) (*AttachVolumeResp, error)
 	Detach(*DetachVolumeReq) (*DetachVolumeResp, error)
+
+	ValidateAttachInstance(*ValidateAttachInstanceReq) (*ValidateAttachInstanceResp, error)
 }
 
 type VolumeStatusType string
@@ -245,4 +247,26 @@ func (dv *DetachVolumeReq) ToQuery() string {
 type DetachVolumeResp struct {
 	RequestId string `json:"RequestId"`
 	Return    bool   `json:"Return"`
+}
+
+type ValidateAttachInstanceReq struct {
+	VolumeType string
+	InstanceId string
+}
+
+func (va *ValidateAttachInstanceReq) ToQuery() string {
+	querySlice := []string{"Action=ValidateAttachInstance"}
+	if va.VolumeType != "" {
+		querySlice = append(querySlice, fmt.Sprintf("VolumeType=%v", va.VolumeType))
+	}
+	if va.InstanceId != "" {
+		querySlice = append(querySlice, fmt.Sprintf("InstanceId=%v", va.InstanceId))
+	}
+
+	return strings.Join(querySlice, Separator)
+}
+
+type ValidateAttachInstanceResp struct {
+	RequestId      string `json:"RequestId"`
+	InstanceEnable bool   `json:"InstanceEnable"`
 }

@@ -140,6 +140,23 @@ func (cli *Client) Detach(detachVolumeReq *DetachVolumeReq) (*DetachVolumeResp, 
 	return detachVolumeResp, nil
 }
 
+func (cli *Client) ValidateAttachInstance(validateAttachInstanceReq *ValidateAttachInstanceReq) (*ValidateAttachInstanceResp, error) {
+	if !validateReqParams(VolumeTypeRegexp, validateAttachInstanceReq.VolumeType) {
+		return nil, status.Errorf(codes.InvalidArgument, "Volume type (%v) is invalid", validateAttachInstanceReq.VolumeType)
+	}
+
+	validateAttachInstanceResp := &ValidateAttachInstanceResp{}
+	query := validateAttachInstanceReq.ToQuery()
+	resp, err := cli.DoRequest(serviceName, query)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(resp, validateAttachInstanceResp); err != nil {
+		return nil, err
+	}
+	return validateAttachInstanceResp, nil
+}
+
 func WaitVolumeStatus(storageService StorageService, volumeId string, targetStatus VolumeStatusType) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

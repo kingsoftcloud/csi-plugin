@@ -90,21 +90,28 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 			},
 		}, nil
 	}
+	// todo
+	// checking volume limit
+	// 是否检查每个账号可以创建的最多 volume 数量
 
 	parameters := SuperMapString(req.Parameters)
-	chargeType := parameters.Get("charge_type", defaultChargeType)
-	volumeType := parameters.Get("volume_type", defaultVolumeType)
+	chargeType := parameters.Get("chargetype", defaultChargeType)
+	volumeType := parameters.Get("type", defaultVolumeType)
+	zone := parameters.Get("zone", d.availabilityZone)
+	projectId := parameters.Get("projectid", "")
 
 	createVolumeReq := &ebsClient.CreateVolumeReq{
-		AvailabilityZone: d.availabilityZone,
+		AvailabilityZone: zone,
 		VolumeName:       volumeName,
 		VolumeDesc:       createdByDO,
 		Size:             size / GB,
 		ChargeType:       chargeType,
 		VolumeType:       volumeType,
+		ProjectId:        projectId,
 	}
+
 	if chargeType == ebsClient.DAILY_CHARGE_TYPE || chargeType == ebsClient.MONTHLY_CHARGE_TYPE {
-		purchaseTime, err := strconv.Atoi(parameters.Get("purchase_time", defaultPurchaseTime))
+		purchaseTime, err := strconv.Atoi(parameters.Get("purchasetime", defaultPurchaseTime))
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
@@ -115,10 +122,6 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	if err != nil {
 		return nil, err
 	}
-
-	// todo
-	// checking volume limit
-	// 是否检查每个账号可以创建的最多 volume 数量
 
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
@@ -235,18 +238,29 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 			}, nil
 		}
 	}
+	// node is attached to a different node, return an error
+	if attachedID != "" {
+		return nil, status.Errorf(codes.FailedPrecondition,
+			"volume is attached to the wrong node(%q), dettach the volume to fix it", attachedID)
+	}
+
+	// validate attach instance
+	validateAttachInstanceResp, err := d.ebsClient.ValidateAttachInstance(&ebsClient.ValidateAttachInstanceReq{
+		VolumeType: vol.VolumeType,
+		InstanceId: req.NodeId,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !validateAttachInstanceResp.InstanceEnable {
+		return nil, status.Errorf(codes.ResourceExhausted, "attach volume limit has been reached on node %v", req.NodeId)
+	}
 
 	// waiting until volume is available
 	if vol.VolumeStatus != ebsClient.AVAILABLE_STATUS {
 		if err := ebsClient.WaitVolumeStatus(d.ebsClient, vol.VolumeId, ebsClient.AVAILABLE_STATUS); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-	}
-
-	// node is attached to a different node, return an error
-	if attachedID != "" {
-		return nil, status.Errorf(codes.FailedPrecondition,
-			"volume is attached to the wrong node(%q), dettach the volume to fix it", attachedID)
 	}
 
 	// attach the volume to the correct node

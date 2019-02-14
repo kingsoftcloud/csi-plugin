@@ -4,3 +4,7 @@ metadata:
   name: test-csi-provisioner 
 provisioner: com.ksc.csi.diskplugin
 parameters:
+  type: SSD3.0
+  zone: cn-beijing-6a
+  chargetype: Daily
+  purchasetime: "10"
