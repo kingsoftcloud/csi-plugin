@@ -1,6 +1,7 @@
 package api
 
 import (
+	"csi-plugin/util"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,18 +23,14 @@ const (
 )
 
 type Client struct {
-	accessKeyId     string //Access Key Id
-	accessKeySecret string //Access Key Secret
-	region          string
-	httpClient      *http.Client
+	region     string
+	httpClient *http.Client
 
 	openApiEndpoint string
 	openApiPrefix   string
 }
 
 type ClientConfig struct {
-	AccessKeyId     string //Access Key Id
-	AccessKeySecret string //Access Key Secret
 	Region          string
 	OpenApiEndpoint string
 	OpenApiPrefix   string
@@ -41,10 +38,8 @@ type ClientConfig struct {
 
 func New(config *ClientConfig) *Client {
 	return &Client{
-		accessKeyId:     config.AccessKeyId,
-		accessKeySecret: config.AccessKeySecret,
-		region:          config.Region,
-		httpClient:      &http.Client{},
+		region:     config.Region,
+		httpClient: &http.Client{},
 
 		openApiEndpoint: config.OpenApiEndpoint,
 		openApiPrefix:   config.OpenApiPrefix,
@@ -85,7 +80,9 @@ func (cli *Client) buildRequestWithBodyReader(serviceName string, body io.Reader
 }
 
 func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
-	s := v4.Signer{Credentials: credentials.NewStaticCredentials(cli.accessKeyId, cli.accessKeySecret, "")}
+
+	ak, sk, _ := util.GetAKSK()
+	s := v4.Signer{Credentials: credentials.NewStaticCredentials(ak, sk, "")}
 	query = fmt.Sprintf("%v&Version=%v", query, Version)
 
 	req, body := cli.buildRequest(service, "")

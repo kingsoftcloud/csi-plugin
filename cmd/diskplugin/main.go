@@ -7,7 +7,6 @@ import (
 	"flag"
 	"os"
 	"os/signal"
-	"strings"
 
 	api "csi-plugin/pkg/open-api"
 
@@ -35,9 +34,6 @@ var (
 	openApiEndpoint = flag.String("open-api-endpoint", "api.ksyun.com", "")
 	openApiSchema   = flag.String("open-api-schema", "https", "")
 	clusterInfoPath = flag.String("cluster-info-path", "/opt/app-agent/arrangement/clusterinfo", "")
-
-	accessKeyId     = flag.String("access-key-id", "", "")
-	accessKeySecret = flag.String("access-key-secret", "", "")
 )
 
 func new_k8sclient() *k8sclient.Clientset {
@@ -88,8 +84,6 @@ func getDriver() *driver.Driver {
 	glog.Infof("cluster info: %v", ci)
 
 	OpenApiConfig := &api.ClientConfig{
-		AccessKeyId:     strings.TrimSpace(*accessKeyId),
-		AccessKeySecret: strings.TrimSpace(*accessKeySecret),
 		OpenApiEndpoint: *openApiEndpoint,
 		OpenApiPrefix:   *openApiSchema,
 		Region:          ci.Region,
@@ -127,6 +121,8 @@ func getDriver() *driver.Driver {
 func main() {
 	flag.Parse()
 	glog.Infof("CSI plugin, version: %s", version)
+
+	util.InitAksk(new_k8sclient())
 
 	d := getDriver()
 	go func() {
