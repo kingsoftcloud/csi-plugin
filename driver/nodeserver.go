@@ -1,6 +1,8 @@
 package driver
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
@@ -8,6 +10,10 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"csi-plugin/util"
+
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -15,9 +21,48 @@ const (
 	diskPrefix = "virtio-"
 )
 
-func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	annNoFormatVolume := d.name + "/noformat"
-	publishInfoVolumeName := d.name + "/volume-name"
+type NodeServer struct {
+	driverName string
+	nodeName   string
+	nodeID     string
+	region     string
+	zone       string
+	mounter    Mounter
+}
+
+func GetNodeServer(config *DriverConfig) *NodeServer {
+	nodeName := os.Getenv("KUBE_NODE_NAME")
+	if nodeName == "" {
+		panic(errors.New("nodename is empty"))
+	}
+
+	// get node instance_uuid
+	instanceUUID, err := util.GetSystemUUID()
+	if err != nil {
+		panic(err)
+	}
+
+	nodeServer := &NodeServer{
+		driverName: config.DriverName,
+		nodeName:   nodeName,
+		nodeID:     instanceUUID,
+		mounter:    newMounter(),
+	}
+
+	k8sCli := config.K8sclient
+	node, err := k8sCli.CoreV1().Nodes().Get(nodeName, meta_v1.GetOptions{})
+	if err != nil {
+		panic(err)
+	}
+	nodeServer.region = node.Labels[util.NodeRegionKey]
+	nodeServer.zone = node.Labels[util.NodeZoneKey]
+
+	return nodeServer
+}
+
+func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+	annNoFormatVolume := d.driverName + "/noformat"
+	publishInfoVolumeName := d.driverName + "/volume-name"
 
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume ID must be provided")
@@ -81,7 +126,7 @@ func (d *Driver) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRe
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
-func (d *Driver) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+func (d *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "NodeUnstageVolume Volume ID must be provided")
 	}
@@ -110,7 +155,7 @@ func (d *Driver) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolu
 }
 
 // NodePublishVolume mounts the volume mounted to the staging path to the target path
-func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+func (d *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "NodePublishVolume Volume ID must be provided")
 	}
@@ -163,7 +208,7 @@ func (d *Driver) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolu
 }
 
 // NodeUnpublishVolume unmounts the volume from the target path
-func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+func (d *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "NodeUnpublishVolume Volume ID must be provided")
 	}
@@ -191,13 +236,13 @@ func (d *Driver) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublish
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-func (d *Driver) NodeGetId(ctx context.Context, req *csi.NodeGetIdRequest) (*csi.NodeGetIdResponse, error) {
+func (d *NodeServer) NodeGetId(ctx context.Context, req *csi.NodeGetIdRequest) (*csi.NodeGetIdResponse, error) {
 	return &csi.NodeGetIdResponse{
 		NodeId: d.nodeID,
 	}, nil
 }
 
-func (d *Driver) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+func (d *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	// currently there is a single NodeServer capability according to the spec
 	nscap := &csi.NodeServiceCapability{
 		Type: &csi.NodeServiceCapability_Rpc{
@@ -214,17 +259,19 @@ func (d *Driver) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabi
 	}, nil
 }
 
-func (d *Driver) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	return &csi.NodeGetInfoResponse{
+func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	resp := &csi.NodeGetInfoResponse{
 		NodeId:            d.nodeID,
 		MaxVolumesPerNode: 3,
 		// make sure that the driver works on this particular region only
 		AccessibleTopology: &csi.Topology{
 			Segments: map[string]string{
-				"region": d.region,
+				util.NodeRegionKey: d.region,
+				util.NodeZoneKey:   d.zone,
 			},
 		},
-	}, nil
+	}
+	return resp, nil
 }
 
 // getDiskSource returns the absolute path of the attached volume for the given

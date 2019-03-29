@@ -23,6 +23,9 @@ const (
 )
 
 type Client struct {
+	accessKeyId     string
+	accessKeySecret string
+
 	region     string
 	httpClient *http.Client
 
@@ -31,6 +34,9 @@ type Client struct {
 }
 
 type ClientConfig struct {
+	AccessKeyId     string
+	AccessKeySecret string
+
 	Region          string
 	OpenApiEndpoint string
 	OpenApiPrefix   string
@@ -38,8 +44,10 @@ type ClientConfig struct {
 
 func New(config *ClientConfig) *Client {
 	return &Client{
-		region:     config.Region,
-		httpClient: &http.Client{},
+		accessKeyId:     config.AccessKeyId,
+		accessKeySecret: config.AccessKeySecret,
+		region:          config.Region,
+		httpClient:      &http.Client{},
 
 		openApiEndpoint: config.OpenApiEndpoint,
 		openApiPrefix:   config.OpenApiPrefix,
@@ -80,8 +88,11 @@ func (cli *Client) buildRequestWithBodyReader(serviceName string, body io.Reader
 }
 
 func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
+	ak, sk := cli.accessKeyId, cli.accessKeySecret
+	if ak == "" || sk == "" {
+		ak, sk, _ = util.GetAKSK()
+	}
 
-	ak, sk, _ := util.GetAKSK()
 	s := v4.Signer{Credentials: credentials.NewStaticCredentials(ak, sk, "")}
 	query = fmt.Sprintf("%v&Version=%v", query, Version)
 

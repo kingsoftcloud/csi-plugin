@@ -27,9 +27,14 @@ const (
 )
 
 var (
-	endpoint   = flag.String("endpoint", "unix://tmp/csi.sock", "CSI endpoint")
-	master     = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
-	kubeconfig = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
+	endpoint         = flag.String("endpoint", "unix://tmp/csi.sock", "CSI endpoint")
+	master           = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
+	kubeconfig       = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
+	controllerServer = flag.Bool("controller-server", false, "value: controller-server=true|false")
+	nodeServer       = flag.Bool("node-server", false, "value: node-server=true|false")
+
+	accessKeyId     = flag.String("access-key-id", "", "")
+	accessKeySecret = flag.String("access-key-secret", "", "")
 
 	openApiEndpoint = flag.String("open-api-endpoint", "api.ksyun.com", "")
 	openApiSchema   = flag.String("open-api-schema", "https", "")
@@ -63,55 +68,45 @@ type ClusterInfo struct {
 	Region    string `json:"region"`
 }
 
-func loadClusterInfo(clusterInfoPath string) *ClusterInfo {
+func loadClusterInfo(clusterInfoPath string) (*ClusterInfo, error) {
 	clusterInfo := &ClusterInfo{}
 	file, err := os.Open(clusterInfoPath)
 	if err != nil {
 		glog.Error("Failed to read clusterinfo: ", err)
-		return nil
+		return nil, err
 	}
 	defer file.Close()
 	if err = json.NewDecoder(file).Decode(clusterInfo); err != nil {
 		glog.Error("Failed to get region and accountId from clusterinfo: ", err)
-		return nil
+		return nil, err
 	}
-	return clusterInfo
+	return clusterInfo, nil
 
 }
 
 func getDriver() *driver.Driver {
-	ci := loadClusterInfo(*clusterInfoPath)
+	ci, err := loadClusterInfo(*clusterInfoPath)
+	if err != nil {
+		panic(err)
+	}
 	glog.Infof("cluster info: %v", ci)
 
 	OpenApiConfig := &api.ClientConfig{
+		AccessKeyId:     *accessKeyId,
+		AccessKeySecret: *accessKeySecret,
 		OpenApiEndpoint: *openApiEndpoint,
 		OpenApiPrefix:   *openApiSchema,
 		Region:          ci.Region,
 	}
-	glog.Infof("open api config: %v", OpenApiConfig)
-
-	// get node instance_uuid
-	instanceUUID, err := util.GetSystemUUID()
-	if err != nil {
-		panic(err)
-	}
-	// get node AvailabilityZone
-	kecCli := kecClient.New(OpenApiConfig)
-	kecInfo, err := kecCli.DescribeInstances(instanceUUID)
-	if err != nil {
-		panic(err)
-	}
-	glog.Infof("kecInfo: %v", kecInfo)
 
 	driverConfig := &driver.DriverConfig{
 		EndPoint:         *endpoint,
+		ControllerServer: *controllerServer,
+		NodeServer:       *nodeServer,
 		DriverName:       driverName,
-		NodeID:           instanceUUID,
 		Version:          version,
-		Region:           ci.Region,
-		AvailabilityZone: kecInfo.AvailabilityZone,
-		EbsClient:        ebsClient.New(OpenApiConfig),
 		KecClient:        kecClient.New(OpenApiConfig),
+		EbsClient:        ebsClient.New(OpenApiConfig),
 		K8sclient:        new_k8sclient(),
 	}
 

@@ -17,6 +17,10 @@ const (
 	dmiDir       = "/sys/class/dmi"
 	ppcDevTree   = "/proc/device-tree"
 	s390xDevTree = "/etc" // s390/s390x changes
+
+	NodeRegionKey = "failure-domain.beta.kubernetes.io/region"
+	NodeZoneKey   = "failure-domain.beta.kubernetes.io/zone"
+	NodeRoleKey   = "kubernetes.io/role"
 )
 
 var (

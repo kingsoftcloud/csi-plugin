@@ -26,4 +26,4 @@ deploy_v0.1.0:
 
 .PHONY: test
 test:
-	go test --cover ./...
+	go test --cover -v  ./driver

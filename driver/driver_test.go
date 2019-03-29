@@ -32,26 +32,81 @@ var (
 	availabilityZone = "test-availabilityzone"
 )
 
+type fakeNodeServer struct {
+	*NodeServer
+}
+
+func getNodeServer(config *DriverConfig) *fakeNodeServer {
+	nodeServer := &fakeNodeServer{
+		NodeServer: &NodeServer{
+			driverName: config.DriverName,
+			nodeName:   nodeID,
+			nodeID:     nodeID,
+			mounter:    NewFakeMounter(),
+		},
+	}
+	return nodeServer
+}
+
+type fakeControllerServer struct {
+	*ControllerServer
+}
+
+func getControllerServer(config *DriverConfig) *fakeControllerServer {
+	return &fakeControllerServer{
+		ControllerServer: &ControllerServer{
+			driverName: config.DriverName,
+			ebsClient:  config.EbsClient,
+			kecClient:  config.KecClient,
+			k8sclient:  &fakeK8sClientWrap{},
+		},
+	}
+}
+
+func (fc *fakeControllerServer) getNodeReginZone() (string, string, error) {
+	return "test-region", "test-zone", nil
+}
+
+type fakeIdentityServer struct {
+	*IdentityServer
+}
+
+func getIdentityServer(config *DriverConfig) *fakeIdentityServer {
+	return &fakeIdentityServer{
+		IdentityServer: &IdentityServer{
+			driverName: config.DriverName,
+			version:    config.Version,
+		},
+	}
+}
+
+type fakeK8sClientWrap struct{}
+
+func (fk *fakeK8sClientWrap) GetNodeReginZone() (string, string, error) {
+	return "test-region", "test-zone", nil
+}
+
 func getDriver(t *testing.T) *Driver {
 	if err := os.Remove(socket); err != nil && !os.IsNotExist(err) {
 		t.Fatalf("failed to remove unix domain socket file %s, error: %s", socket, err)
 	}
 
 	driverConfig := &DriverConfig{
-		EndPoint:         endpoint,
-		DriverName:       driverName,
-		NodeID:           nodeID,
-		Version:          version,
-		Region:           region,
-		AvailabilityZone: availabilityZone,
-		EbsClient:        NewFakeStorageClient(),
-		KecClient:        NewFakeKecClient(),
+		EndPoint:   endpoint,
+		DriverName: driverName,
+		Version:    version,
+		EbsClient:  NewFakeStorageClient(),
+		KecClient:  NewFakeKecClient(),
 	}
 
-	d := NewDriver(driverConfig)
-	d.mounter = NewFakeMounter()
-
-	return d
+	driver := &Driver{
+		endpoint:         endpoint,
+		identityServer:   getIdentityServer(driverConfig),
+		controllerServer: getControllerServer(driverConfig),
+		nodeServer:       getNodeServer(driverConfig),
+		ready:            true,
+	}
+	return driver
 }
 
 func TestDriverSuite(t *testing.T) {
@@ -115,10 +170,6 @@ func (f *FakeStorageClient) GetVolume(listVolumesReq *ebsClient.ListVolumesReq) 
 }
 
 func (f *FakeStorageClient) CreateVolume(createVolumeReq *ebsClient.CreateVolumeReq) (*ebsClient.CreateVolumeResp, error) {
-	// if err := ebsClient.ValidateCreateVolumeReq(createVolumeReq); err != nil {
-	// 	return nil, err
-	// }
-
 	id := randString(32)
 	vol := &ebsClient.Volume{
 		VolumeId:         id,

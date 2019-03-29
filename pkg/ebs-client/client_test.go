@@ -21,8 +21,8 @@ func init() {
 
 func getEbsClient() *Client {
 	OpenApiConfig := &api.ClientConfig{
-		AccessKeyId:     "AKLTd3j9wnDnSamjGtU4Ngj8og",
-		AccessKeySecret: "ON9XNwu+DFCOhbmABbCQmVm9eldy8EkeOKw0lIKH462fkDPb5jBvUGw67vW5aaSHhw==",
+		AccessKeyId:     "",
+		AccessKeySecret: "",
 		OpenApiEndpoint: "api.ksyun.com",
 		OpenApiPrefix:   "https",
 		Region:          "cn-beijing-6",

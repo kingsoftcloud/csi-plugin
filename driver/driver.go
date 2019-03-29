@@ -20,30 +20,22 @@ import (
 )
 
 type Driver struct {
-	name             string
-	nodeID           string
-	version          string
-	endpoint         string
-	region           string
-	availabilityZone string
+	endpoint string
+	srv      *grpc.Server
+	readyMu  sync.Mutex
+	ready    bool
 
-	ebsClient ebsClient.StorageService
-	kecClient kecClient.KecService
-	mounter   Mounter
-	k8sclient *k8sclient.Clientset
-	srv       *grpc.Server
-
-	readyMu sync.Mutex
-	ready   bool
+	controllerServer csi.ControllerServer
+	identityServer   csi.IdentityServer
+	nodeServer       csi.NodeServer
 }
 
 type DriverConfig struct {
+	ControllerServer bool
+	NodeServer       bool
 	EndPoint         string
 	DriverName       string
-	NodeID           string
 	Version          string
-	Region           string
-	AvailabilityZone string
 	EbsClient        ebsClient.StorageService
 	KecClient        kecClient.KecService
 	K8sclient        *k8sclient.Clientset
@@ -54,29 +46,26 @@ func NewDriver(config *DriverConfig) *Driver {
 		glog.Errorf("Driver name missing")
 		return nil
 	}
-
-	if config.NodeID == "" {
-		glog.Errorf("NodeID missing")
-		return nil
-	}
 	// TODO version format and validation
 	if len(config.Version) == 0 {
 		glog.Errorf("Version argument missing")
 		return nil
 	}
-
-	return &Driver{
-		name:             config.DriverName,
-		nodeID:           config.NodeID,
-		version:          config.Version,
+	driver := &Driver{
 		endpoint:         config.EndPoint,
-		region:           config.Region,
-		availabilityZone: config.AvailabilityZone,
-		ebsClient:        config.EbsClient,
-		kecClient:        config.KecClient,
-		k8sclient:        config.K8sclient,
-		mounter:          newMounter(),
+		identityServer:   GetIdentityServer(config),
+		controllerServer: nil,
+		nodeServer:       nil,
+		ready:            false,
 	}
+	if config.ControllerServer {
+		driver.controllerServer = GetControllerServer(config)
+	}
+	if config.NodeServer {
+		driver.nodeServer = GetNodeServer(config)
+	}
+
+	return driver
 }
 
 func (d *Driver) Run() error {
@@ -102,13 +91,15 @@ func (d *Driver) Run() error {
 	}
 	d.srv = grpc.NewServer(opts...)
 
-	csi.RegisterIdentityServer(d.srv, d)
-	csi.RegisterControllerServer(d.srv, d)
-	csi.RegisterNodeServer(d.srv, d)
+	csi.RegisterIdentityServer(d.srv, d.identityServer)
+	if d.controllerServer != nil {
+		csi.RegisterControllerServer(d.srv, d.controllerServer)
+	}
+	if d.nodeServer != nil {
+		csi.RegisterNodeServer(d.srv, d.nodeServer)
+	}
 
-	d.ready = true
 	glog.Infof("Listening for connections on address: %#v", listener.Addr())
-
 	return d.srv.Serve(listener)
 }
 

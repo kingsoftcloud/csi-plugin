@@ -6,15 +6,28 @@ import (
 	"golang.org/x/net/context"
 )
 
-func (d *Driver) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
+type IdentityServer struct {
+	driverName string
+	version    string
+	ready      bool
+}
+
+func GetIdentityServer(config *DriverConfig) *IdentityServer {
+	return &IdentityServer{
+		driverName: config.DriverName,
+		version:    config.Version,
+	}
+}
+
+func (d *IdentityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	resp := &csi.GetPluginInfoResponse{
-		Name:          d.name,
+		Name:          d.driverName,
 		VendorVersion: d.version,
 	}
 	return resp, nil
 }
 
-func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
+func (d *IdentityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
 	resp := &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
@@ -36,6 +49,6 @@ func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCa
 	return resp, nil
 }
 
-func (d *Driver) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
+func (d *IdentityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	return &csi.ProbeResponse{Ready: &wrappers.BoolValue{Value: d.ready}}, nil
 }

@@ -2,15 +2,23 @@ package driver
 
 import (
 	ebsClient "csi-plugin/pkg/ebs-client"
+	kecClient "csi-plugin/pkg/kec-client"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"strconv"
+
+	"csi-plugin/util"
 
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	k8s_v1 "k8s.io/api/core/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sclient "k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -28,7 +36,24 @@ const (
 	defaultPurchaseTime = "1"
 )
 
-func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+type ControllerServer struct {
+	driverName string
+
+	ebsClient ebsClient.StorageService
+	kecClient kecClient.KecService
+	k8sclient K8sClientWrapper
+}
+
+func GetControllerServer(config *DriverConfig) *ControllerServer {
+	return &ControllerServer{
+		driverName: config.DriverName,
+		ebsClient:  config.EbsClient,
+		kecClient:  config.KecClient,
+		k8sclient:  GetK8sClientWrapper(config.K8sclient),
+	}
+}
+
+func (d *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	// check parameters
 	if req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "Volume name must be provided")
@@ -46,21 +71,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 		return nil, status.Errorf(codes.OutOfRange, "invalid capacity range: %v", err)
 	}
 
-	if req.AccessibilityRequirements != nil {
-		for _, t := range req.AccessibilityRequirements.Requisite {
-			region, ok := t.Segments["region"]
-			if !ok {
-				continue // nothing to do
-			}
-
-			if region != d.region {
-				return nil, status.Errorf(codes.ResourceExhausted, "volume can be only created in region: %q, got: %q", d.region, region)
-			}
-		}
-	}
-
 	volumeName := req.Name
-
 	// get volume first, if it's created do no thing
 	listVolumesResp, err := d.ebsClient.ListVolumes(&ebsClient.ListVolumesReq{})
 	if err != nil {
@@ -93,12 +104,19 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	// todo
 	// checking volume limit
 	// 是否检查每个账号可以创建的最多 volume 数量
-
 	parameters := SuperMapString(req.Parameters)
 	chargeType := parameters.Get("chargetype", defaultChargeType)
 	volumeType := parameters.Get("type", defaultVolumeType)
-	zone := parameters.Get("zone", d.availabilityZone)
 	projectId := parameters.Get("projectid", "")
+	region := parameters.Get("region", "")
+	zone := parameters.Get("zone", "")
+	if region == "" || zone == "" {
+		region, zone, err = d.k8sclient.GetNodeReginZone()
+		if err != nil {
+			return nil, err
+		}
+		glog.Info(fmt.Sprintf("rand region and zone: %s, %s", region, zone))
+	}
 
 	createVolumeReq := &ebsClient.CreateVolumeReq{
 		AvailabilityZone: zone,
@@ -130,7 +148,8 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 			AccessibleTopology: []*csi.Topology{
 				{
 					Segments: map[string]string{
-						"region": d.region,
+						util.NodeRegionKey: region,
+						util.NodeZoneKey:   zone,
 					},
 				},
 			},
@@ -140,7 +159,7 @@ func (d *Driver) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest)
 	return resp, nil
 }
 
-func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+func (d *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "DeleteVolume Volume ID must be provided")
 	}
@@ -155,7 +174,7 @@ func (d *Driver) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest)
 }
 
 // ControllerUnpublishVolume deattaches the given volume from the node
-func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+func (d *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Volume ID must be provided")
 	}
@@ -189,8 +208,8 @@ func (d *Driver) ControllerUnpublishVolume(ctx context.Context, req *csi.Control
 }
 
 // ControllerPublishVolume attaches the given volume to the node
-func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	publishInfoVolumeName := d.name + "/volume-name"
+func (d *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+	publishInfoVolumeName := d.driverName + "/volume-name"
 
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Volume ID must be provided")
@@ -284,7 +303,7 @@ func (d *Driver) ControllerPublishVolume(ctx context.Context, req *csi.Controlle
 	}, nil
 }
 
-func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
+func (d *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "ValidateVolumeCapabilities Volume ID must be provided")
 	}
@@ -292,28 +311,16 @@ func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valida
 	if req.VolumeCapabilities == nil {
 		return nil, status.Error(codes.InvalidArgument, "ValidateVolumeCapabilities Volume Capabilities must be provided")
 	}
+	if !validateCapabilities(req.VolumeCapabilities) {
+		return nil, status.Error(codes.InvalidArgument, "invalid volume capabilities requested. Only SINGLE_NODE_WRITER is supported ('accessModes.ReadWriteOnce' on Kubernetes)")
+	}
+
 	listVolumesReq := &ebsClient.ListVolumesReq{
 		VolumeIds: []string{req.VolumeId},
 	}
 	_, err := d.ebsClient.GetVolume(listVolumesReq)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, err.Error())
-	}
-	if req.AccessibleTopology != nil {
-		for _, t := range req.AccessibleTopology {
-			region, ok := t.Segments["region"]
-			if !ok {
-				continue // nothing to do
-			}
-
-			if region != d.region {
-				// return early if a different region is expected
-				glog.Info("supported capabilities false")
-				return &csi.ValidateVolumeCapabilitiesResponse{
-					Supported: false,
-				}, nil
-			}
-		}
 	}
 
 	// if it's not supported (i.e: wrong region), we shouldn't override it
@@ -323,7 +330,7 @@ func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, req *csi.Valida
 	return resp, nil
 }
 
-func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
+func (d *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	listVolumesResp, err := d.ebsClient.ListVolumes(&ebsClient.ListVolumesReq{})
 	if err != nil {
 		return nil, err
@@ -350,11 +357,11 @@ func (d *Driver) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (
 	return resp, nil
 }
 
-func (d *Driver) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
+func (d *ControllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (d *Driver) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
+func (d *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	newCap := func(cap csi.ControllerServiceCapability_RPC_Type) *csi.ControllerServiceCapability {
 		return &csi.ControllerServiceCapability{
 			Type: &csi.ControllerServiceCapability_Rpc{
@@ -381,14 +388,47 @@ func (d *Driver) ControllerGetCapabilities(ctx context.Context, req *csi.Control
 	return resp, nil
 }
 
-func (d *Driver) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
+func (d *ControllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (d *Driver) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
+func (d *ControllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (d *Driver) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
+func (d *ControllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
+}
+
+type K8sClientWrapper interface {
+	GetNodeReginZone() (string, string, error)
+}
+
+type K8sClientWrap struct {
+	k8sclient *k8sclient.Clientset
+}
+
+func GetK8sClientWrapper(k8sclient *k8sclient.Clientset) K8sClientWrapper {
+	return &K8sClientWrap{
+		k8sclient: k8sclient,
+	}
+}
+
+func (kc *K8sClientWrap) GetNodeReginZone() (string, string, error) {
+	var randNode k8s_v1.Node
+	nodeList := []k8s_v1.Node{}
+
+	nodes, err := kc.k8sclient.CoreV1().Nodes().List(meta_v1.ListOptions{})
+	if err != nil {
+		return "", "", err
+	}
+
+	for _, node := range nodes.Items {
+		if node.Labels[util.NodeRoleKey] == "node" {
+			nodeList = append(nodeList, node)
+		}
+		rand.Seed(time.Now().UnixNano())
+		randNode = nodeList[rand.Intn(len(nodeList))]
+	}
+	return randNode.Labels[util.NodeRegionKey], randNode.Labels[util.NodeZoneKey], nil
 }

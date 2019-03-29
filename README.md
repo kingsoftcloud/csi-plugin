@@ -40,12 +40,14 @@ metadata:
 provisioner: ksc/ebs
 parameters:
   type: SSD3.0
+  region: cn-beijing-6
   zone: cn-beijing-6a
   chargetype: Daily
   purchasetime: "10"
 ```
 > 参数说明： 
 > - type: EBS类型，必填，可选参数：SSD2.0/SSD3.0/SATA2.0/SATA3.0（字母全部大写）。
+> - region: 创建云盘的集群地域
 > - zone: 创建云盘的可用区，注意不同可用区可创建的EBS类型不一样，具体对应关系参考 [云硬盘使用限制](https://docs.ksyun.com/documents/5423)，默认值是插件所在node的可用区。
 > - chargetype: 云盘的计费方式，默认值为Daliy，详情参考[创建云硬盘Open Api](https://docs.ksyun.com/documents/5446)中的chargetype字段。
 > - purchasetime: 若选择"包年包月"的计费方式，需要设置购买时长，单位为月, 默认值是 1 月。

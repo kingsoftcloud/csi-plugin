@@ -3,12 +3,12 @@ package kecClient
 import (
 	api "csi-plugin/pkg/open-api"
 	"flag"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/golang/glog"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -21,8 +21,8 @@ func init() {
 
 func getKecClient() *Client {
 	OpenApiConfig := &api.ClientConfig{
-		AccessKeyId:     "AKLTd3j9wnDnSamjGtU4Ngj8og",
-		AccessKeySecret: "ON9XNwu+DFCOhbmABbCQmVm9eldy8EkeOKw0lIKH462fkDPb5jBvUGw67vW5aaSHhw==",
+		AccessKeyId:     "",
+		AccessKeySecret: "",
 		OpenApiEndpoint: "api.ksyun.com",
 		OpenApiPrefix:   "https",
 		Region:          "cn-beijing-6",
@@ -45,6 +45,7 @@ var _ = Describe("Test KecClient", func() {
 		var instanceUUID = ""
 		It("should fail when no instance uuid is provided", func() {
 			kecInfo, err := client.DescribeInstances(instanceUUID)
+			fmt.Println(kecInfo)
 			glog.Info(err)
 			Expect(err).To(HaveOccurred())
 			Expect(kecInfo).To(BeNil())

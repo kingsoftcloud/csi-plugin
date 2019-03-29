@@ -24,6 +24,7 @@ spec:
           image: quay.io/k8scsi/csi-provisioner:v0.4.2
           args:
             - "--provisioner=com.ksc.csi.diskplugin"
+            - "--feature-gates=Topology=true"
             - "--csi-address=$(ADDRESS)"
             - "--v=5"
           env:
@@ -46,9 +47,10 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-diskplugin
-          image: hub.kce.ksyun.com/hsxue/csi-diskplugin:v0.1.0
+          image: hub.kce.ksyun.com/hsxue/csi-diskplugin:v0.2.0
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
+            - "--controller-server=true"
             - "--v=5"
             - "--alsologtostderr=true"
           env:
@@ -200,14 +202,20 @@ spec:
             - name: registration-dir
               mountPath: /registration/
         - name: csi-diskplugin
-          image: hub.kce.ksyun.com/hsxue/csi-diskplugin:v0.1.0
+          image: hub.kce.ksyun.com/hsxue/csi-diskplugin:v0.2.0
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
+            - "--node-server=true"
             - "--v=5"
             - "--alsologtostderr=true"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
           imagePullPolicy: "Always"
           securityContext:
             privileged: true
