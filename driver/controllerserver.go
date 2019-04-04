@@ -416,19 +416,13 @@ func GetK8sClientWrapper(k8sclient *k8sclient.Clientset) K8sClientWrapper {
 
 func (kc *K8sClientWrap) GetNodeReginZone() (string, string, error) {
 	var randNode k8s_v1.Node
-	nodeList := []k8s_v1.Node{}
 
 	nodes, err := kc.k8sclient.CoreV1().Nodes().List(meta_v1.ListOptions{})
 	if err != nil {
 		return "", "", err
 	}
 
-	for _, node := range nodes.Items {
-		if node.Labels[util.NodeRoleKey] == "node" {
-			nodeList = append(nodeList, node)
-		}
-		rand.Seed(time.Now().UnixNano())
-		randNode = nodeList[rand.Intn(len(nodeList))]
-	}
+	rand.Seed(time.Now().UnixNano())
+	randNode = nodes.Items[rand.Intn(len(nodes.Items))]
 	return randNode.Labels[util.NodeRegionKey], randNode.Labels[util.NodeZoneKey], nil
 }
