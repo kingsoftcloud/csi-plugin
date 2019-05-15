@@ -1,0 +1,11 @@
+apiVersion: storage.k8s.io/v1beta1
+kind: StorageClass
+metadata:
+  name: test-csi-provisioner
+provisioner: com.ksc.csi.diskplugin
+parameters:
+  type: SSD3.0
+  # region: cn-beijing-6
+  # zone: cn-beijing-6a
+  chargetype: Daily
+  purchasetime: "10"

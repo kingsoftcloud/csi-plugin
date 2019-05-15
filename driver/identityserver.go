@@ -1,30 +1,36 @@
-package main
+package driver
 
 import (
-	glog "github.com/Sirupsen/logrus"
-	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"golang.org/x/net/context"
 )
 
-type identityServer struct {
+type IdentityServer struct {
+	driverName string
+	version    string
+	ready      bool
 }
 
-func (i *identityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	glog.Info("IdentityServer GetPluginInfo called...")
+func GetIdentityServer(config *DriverConfig) *IdentityServer {
+	return &IdentityServer{
+		driverName: config.DriverName,
+		version:    config.Version,
+	}
+}
+
+func (d *IdentityServer) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	resp := &csi.GetPluginInfoResponse{
-		Name:          driverName,
-		VendorVersion: version,
+		Name:          d.driverName,
+		VendorVersion: d.version,
 	}
 	return resp, nil
 }
 
-func (i *identityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	glog.Info("IdentityServer GetPluginCapabilities called...")
+func (d *IdentityServer) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
 	resp := &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
-
 				Type: &csi.PluginCapability_Service_{
 					Service: &csi.PluginCapability_Service{
 						Type: csi.PluginCapability_Service_CONTROLLER_SERVICE,
@@ -34,7 +40,7 @@ func (i *identityServer) GetPluginCapabilities(ctx context.Context, req *csi.Get
 			{
 				Type: &csi.PluginCapability_Service_{
 					Service: &csi.PluginCapability_Service{
-						Type: csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
+						Type: csi.PluginCapability_Service_ACCESSIBILITY_CONSTRAINTS,
 					},
 				},
 			},
@@ -43,7 +49,6 @@ func (i *identityServer) GetPluginCapabilities(ctx context.Context, req *csi.Get
 	return resp, nil
 }
 
-func (i *identityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	glog.Info("IdentityServer Probe called...")
-	return &csi.ProbeResponse{Ready: &wrappers.BoolValue{Value: true}}, nil
+func (d *IdentityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
+	return &csi.ProbeResponse{Ready: &wrappers.BoolValue{Value: d.ready}}, nil
 }
