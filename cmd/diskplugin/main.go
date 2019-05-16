@@ -10,8 +10,6 @@ import (
 
 	api "csi-plugin/pkg/open-api"
 
-	kecClient "csi-plugin/pkg/kec-client"
-
 	"csi-plugin/util"
 
 	"github.com/golang/glog"
@@ -105,7 +103,6 @@ func getDriver() *driver.Driver {
 		NodeServer:       *nodeServer,
 		DriverName:       driverName,
 		Version:          version,
-		KecClient:        kecClient.New(OpenApiConfig),
 		EbsClient:        ebsClient.New(OpenApiConfig),
 		K8sclient:        new_k8sclient(),
 	}

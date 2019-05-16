@@ -11,7 +11,6 @@ import (
 	"time"
 
 	ebsClient "csi-plugin/pkg/ebs-client"
-	kecClient "csi-plugin/pkg/kec-client"
 
 	"github.com/kubernetes-csi/csi-test/pkg/sanity"
 )
@@ -57,8 +56,8 @@ func getControllerServer(config *DriverConfig) *fakeControllerServer {
 		ControllerServer: &ControllerServer{
 			driverName: config.DriverName,
 			ebsClient:  config.EbsClient,
-			kecClient:  config.KecClient,
-			k8sclient:  &fakeK8sClientWrap{},
+			// kecClient:  config.KecClient,
+			k8sclient: &fakeK8sClientWrap{},
 		},
 	}
 }
@@ -96,7 +95,6 @@ func getDriver(t *testing.T) *Driver {
 		DriverName: driverName,
 		Version:    version,
 		EbsClient:  NewFakeStorageClient(),
-		KecClient:  NewFakeKecClient(),
 	}
 
 	driver := &Driver{
@@ -234,28 +232,6 @@ func randString(n int) string {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
 	return string(b)
-}
-
-type FakeKecClient struct {
-	nodes map[string]*kecClient.KecInfo
-}
-
-func NewFakeKecClient() *FakeKecClient {
-	return &FakeKecClient{
-		nodes: map[string]*kecClient.KecInfo{
-			"test-node": &kecClient.KecInfo{
-				InstanceId: "test-node",
-			},
-		},
-	}
-}
-
-func (fk FakeKecClient) DescribeInstances(instance_id string) (*kecClient.KecInfo, error) {
-	node, ok := fk.nodes[instance_id]
-	if !ok {
-		return nil, errors.New("node not found")
-	}
-	return node, nil
 }
 
 type fakeMounter struct{}

@@ -2,7 +2,6 @@ package driver
 
 import (
 	ebsClient "csi-plugin/pkg/ebs-client"
-	kecClient "csi-plugin/pkg/kec-client"
 	"fmt"
 	"net"
 	"os"
@@ -37,7 +36,6 @@ type DriverConfig struct {
 	DriverName       string
 	Version          string
 	EbsClient        ebsClient.StorageService
-	KecClient        kecClient.KecService
 	K8sclient        *k8sclient.Clientset
 }
 

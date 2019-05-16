@@ -2,7 +2,6 @@ package driver
 
 import (
 	ebsClient "csi-plugin/pkg/ebs-client"
-	kecClient "csi-plugin/pkg/kec-client"
 	"fmt"
 	"math/rand"
 	"time"
@@ -40,7 +39,6 @@ type ControllerServer struct {
 	driverName string
 
 	ebsClient ebsClient.StorageService
-	kecClient kecClient.KecService
 	k8sclient K8sClientWrapper
 }
 
@@ -48,7 +46,6 @@ func GetControllerServer(config *DriverConfig) *ControllerServer {
 	return &ControllerServer{
 		driverName: config.DriverName,
 		ebsClient:  config.EbsClient,
-		kecClient:  config.KecClient,
 		k8sclient:  GetK8sClientWrapper(config.K8sclient),
 	}
 }
@@ -191,10 +188,6 @@ func (d *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		return nil, status.Errorf(codes.NotFound, err.Error())
 	}
 
-	// // check if node exist before trying to detach the volume from the node
-	// if _, err := d.kecClient.DescribeInstances(req.NodeId); err != nil {
-	// 	return nil, status.Errorf(codes.NotFound, "node %q not found", req.NodeId)
-	// }
 	detachVolumeReq := &ebsClient.DetachVolumeReq{
 		req.VolumeId,
 		req.NodeId,
@@ -239,11 +232,6 @@ func (d *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, err.Error())
 	}
-
-	// // check if kec node exist before trying to attach the volume to the node
-	// if _, err := d.kecClient.DescribeInstances(req.NodeId); err != nil {
-	// 	return nil, status.Errorf(codes.NotFound, "node %q not found", req.NodeId)
-	// }
 
 	attachedID := ""
 	for _, attachment := range vol.Attachments {
