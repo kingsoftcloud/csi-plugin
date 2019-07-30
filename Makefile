@@ -1,4 +1,5 @@
 VERSION ?= latest
+ARCH ?= amd64
 
 all: clean compile build
 
@@ -8,16 +9,14 @@ clean:
 
 .PHONY: compile
 compile:
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o csi-diskplugin ./cmd/diskplugin
+	mkdir -p bin
+	GOOS=linux GOARCH=$(ARCH) CGO_ENABLED=0 go build -o ./bin/csi-diskplugin ./cmd/diskplugin
 
-.PHONY: build
-build:
-	docker build -t csi-diskplugin:$(VERSION) -f Dockerfile .
+build: compile
+	docker build -t hub.kce.ksyun.com/ksyun/csi-diskplugin-$(ARCH):$(VERSION) -f Dockerfile .
 
-.PHONY: push
-push:
-	docker tag csi-diskplugin:$(VERSION) hub.kce.ksyun.com/hsxue/csi-diskplugin:$(VERSION)
-	docker push hub.kce.ksyun.com/hsxue/csi-diskplugin:$(VERSION)
+push: build
+	docker push hub.kce.ksyun.com/ksyun/csi-diskplugin-$(ARCH):$(VERSION)
 
 .PHONY: deploy_v0.1.0
 deploy_v0.1.0:
