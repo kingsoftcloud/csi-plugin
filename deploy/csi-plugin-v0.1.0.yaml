@@ -47,7 +47,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-diskplugin
-          image: hub.kce.ksyun.com/ksyun/csi-diskplugin-amd64:v0.1.0
+          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:v0.1.0-mp
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--controller-server=true"
@@ -202,7 +202,7 @@ spec:
             - name: registration-dir
               mountPath: /registration/
         - name: csi-diskplugin
-          image: hub.kce.ksyun.com/ksyun/csi-diskplugin-amd64:v0.1.0
+          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:v0.1.0-mp
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--node-server=true"

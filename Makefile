@@ -13,10 +13,10 @@ compile:
 	GOOS=linux GOARCH=$(ARCH) CGO_ENABLED=0 go build -o ./bin/csi-diskplugin ./cmd/diskplugin
 
 build: compile
-	docker build -t hub.kce.ksyun.com/ksyun/csi-diskplugin-$(ARCH):$(VERSION) -f Dockerfile .
+	docker build -t hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH) -f Dockerfile.$(ARCH) .
 
 push: build
-	docker push hub.kce.ksyun.com/ksyun/csi-diskplugin-$(ARCH):$(VERSION)
+	docker push hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH)
 
 .PHONY: deploy_v0.1.0
 deploy_v0.1.0:
