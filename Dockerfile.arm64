@@ -1,4 +1,5 @@
-FROM arm64v8/alpine
+FROM hub.kce.ksyun.com/tekton/arm64v8/alpine
+#FROM arm64v8/alpine
 LABEL maintainers="ksc"
 
 RUN apk -U upgrade && \
