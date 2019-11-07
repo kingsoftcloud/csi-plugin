@@ -1,4 +1,5 @@
-FROM alpine
+FROM hub.kce.ksyun.com/tekton/alpine
+#FROM alpine
 LABEL maintainers="ksc"
 
 RUN apk -U upgrade && \
