@@ -4,18 +4,18 @@
 
 **注意：** 
 1. 由于金山云硬盘不支持跨可用区挂载，所以要保证集群的所有node节点都在同一个可用区。
-2. 支持的k8s版本: v1.12
+2. 支持的k8s版本: v1.12 以上
 
 
 ### 服务编译和发布
 
 构建镜像：
 
-    make build VERSION=v0.1.0
+    make build VERSION=v0.1.1
     
 推送镜像：
 
-    make push VERSION=v0.1.0
+    make push VERSION=v0.1.1
 
 单元测试：
 

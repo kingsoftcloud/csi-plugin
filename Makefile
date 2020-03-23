@@ -26,3 +26,10 @@ deploy_v0.1.0:
 .PHONY: test
 test:
 	go test --cover -v  ./driver
+
+build-mp-image:
+	manifest-tool --username admin --password UHdkLUZvci1TZWNyZXRhcnktTWlhbwo= \
+	push from-args --platforms linux/amd64,linux/arm64 \
+	--template hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-ARCH \
+	--target hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-mp \
+	
