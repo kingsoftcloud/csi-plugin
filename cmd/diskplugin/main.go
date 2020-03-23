@@ -34,8 +34,8 @@ var (
 	accessKeyId     = flag.String("access-key-id", "", "")
 	accessKeySecret = flag.String("access-key-secret", "", "")
 
-	openApiEndpoint = flag.String("open-api-endpoint", "api.ksyun.com", "")
-	openApiSchema   = flag.String("open-api-schema", "https", "")
+	openApiEndpoint = flag.String("open-api-endpoint", "internal.api.ksyun.com", "")
+	openApiSchema   = flag.String("open-api-schema", "http", "")
 	clusterInfoPath = flag.String("cluster-info-path", "/opt/app-agent/arrangement/clusterinfo", "")
 )
 
