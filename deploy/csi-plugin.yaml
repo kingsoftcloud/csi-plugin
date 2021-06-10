@@ -5,11 +5,15 @@
 ##############################################
 
 kind: StatefulSet
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 metadata:
   name: csi-controller
   namespace: kube-system
 spec:
+  selector:
+    matchLabels:
+      app: csi-controller
+      role: csi-do
   serviceName: "csi-do"
   replicas: 1
   template:
@@ -161,7 +165,7 @@ roleRef:
 #######################################
 
 kind: DaemonSet
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 metadata:
   name: csi-diskplugin
   namespace: kube-system

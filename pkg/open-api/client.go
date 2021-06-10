@@ -92,7 +92,7 @@ func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
 	ak, sk := cli.accessKeyId, cli.accessKeySecret
 	if ak == "" || sk == "" {
 		aksk, _ = util.GetAKSK()
-		ak = aksk.SK
+		ak = aksk.AK
 		sk = aksk.SK
 	}
 	s := v4.Signer{Credentials: credentials.NewStaticCredentials(ak, sk, "")}
