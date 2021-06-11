@@ -7,7 +7,7 @@ import (
 
 	ebsClient "csi-plugin/pkg/ebs-client"
 
-	"github.com/container-storage-interface/spec/lib/go/csi/v0"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 )
 
 var (
