@@ -40,7 +40,7 @@ func (d *IdentityServer) GetPluginCapabilities(ctx context.Context, req *csi.Get
 			{
 				Type: &csi.PluginCapability_Service_{
 					Service: &csi.PluginCapability_Service{
-						Type: csi.PluginCapability_Service_ACCESSIBILITY_CONSTRAINTS,
+						Type: csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
 					},
 				},
 			},

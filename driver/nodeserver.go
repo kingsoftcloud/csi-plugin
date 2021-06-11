@@ -50,7 +50,7 @@ func GetNodeServer(config *DriverConfig) *NodeServer {
 	}
 
 	k8sCli := config.K8sclient
-	node, err := k8sCli.CoreV1().Nodes().Get(nodeName, meta_v1.GetOptions{})
+	node, err := k8sCli.CoreV1().Nodes().Get(context.Background(), nodeName, meta_v1.GetOptions{})
 	if err != nil {
 		panic(err)
 	}
@@ -76,7 +76,7 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume Capability must be provided")
 	}
 
-	if _, ok := req.GetPublishInfo()[publishInfoVolumeName]; !ok {
+	if _, ok := req.GetPublishContext()[publishInfoVolumeName]; !ok {
 		return nil, status.Error(codes.InvalidArgument, "Could not find the volume by name")
 	}
 
@@ -91,7 +91,7 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		fsType = mnt.FsType
 	}
 
-	_, ok := req.VolumeAttributes[annNoFormatVolume]
+	_, ok := req.GetVolumeContext()[annNoFormatVolume]
 	if !ok {
 		formatted, err := d.mounter.IsFormatted(source)
 		if err != nil {
@@ -236,10 +236,12 @@ func (d *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-func (d *NodeServer) NodeGetId(ctx context.Context, req *csi.NodeGetIdRequest) (*csi.NodeGetIdResponse, error) {
-	return &csi.NodeGetIdResponse{
-		NodeId: d.nodeID,
-	}, nil
+func (d *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
 }
 
 func (d *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {

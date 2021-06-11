@@ -93,7 +93,7 @@ func (d *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		glog.Info("volume already created")
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
-				Id:            vol.VolumeId,
+				VolumeId:      vol.VolumeId,
 				CapacityBytes: vol.Size * GB,
 			},
 		}, nil
@@ -140,7 +140,7 @@ func (d *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
-			Id:            createVolumeResp.VolumeId,
+			VolumeId:      createVolumeResp.VolumeId,
 			CapacityBytes: size,
 			AccessibleTopology: []*csi.Topology{
 				{
@@ -239,7 +239,7 @@ func (d *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		if attachment.InstanceId == req.NodeId {
 			glog.Info("volume is already attached")
 			return &csi.ControllerPublishVolumeResponse{
-				PublishInfo: map[string]string{
+				PublishContext: map[string]string{
 					publishInfoVolumeName: vol.VolumeName,
 				},
 			}, nil
@@ -285,7 +285,7 @@ func (d *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 	glog.Info("volume attaced")
 	return &csi.ControllerPublishVolumeResponse{
-		PublishInfo: map[string]string{
+		PublishContext: map[string]string{
 			publishInfoVolumeName: vol.VolumeName,
 		},
 	}, nil
@@ -313,7 +313,10 @@ func (d *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *
 
 	// if it's not supported (i.e: wrong region), we shouldn't override it
 	resp := &csi.ValidateVolumeCapabilitiesResponse{
-		Supported: validateCapabilities(req.VolumeCapabilities),
+		Confirmed: &csi.ValidateVolumeCapabilitiesResponse_Confirmed{
+			VolumeContext:      req.GetVolumeContext(),
+			VolumeCapabilities: req.GetVolumeCapabilities(),
+			Parameters:         req.GetParameters()},
 	}
 	return resp, nil
 }
@@ -332,7 +335,7 @@ func (d *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumes
 	for _, vol := range volumes {
 		entries = append(entries, &csi.ListVolumesResponse_Entry{
 			Volume: &csi.Volume{
-				Id:            vol.VolumeId,
+				VolumeId:      vol.VolumeId,
 				CapacityBytes: int64(vol.Size * GB),
 			},
 		})
@@ -361,12 +364,12 @@ func (d *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *c
 	}
 
 	var caps []*csi.ControllerServiceCapability
-	for _, cap := range []csi.ControllerServiceCapability_RPC_Type{
+	for _, csCap := range []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
 	} {
-		caps = append(caps, newCap(cap))
+		caps = append(caps, newCap(csCap))
 	}
 
 	resp := &csi.ControllerGetCapabilitiesResponse{
@@ -388,6 +391,14 @@ func (d *ControllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnaps
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
+func (d *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (d *ControllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
 type K8sClientWrapper interface {
 	GetNodeReginZone() (string, string, error)
 }
@@ -405,7 +416,7 @@ func GetK8sClientWrapper(k8sclient *k8sclient.Clientset) K8sClientWrapper {
 func (kc *K8sClientWrap) GetNodeReginZone() (string, string, error) {
 	var randNode k8s_v1.Node
 
-	nodes, err := kc.k8sclient.CoreV1().Nodes().List(meta_v1.ListOptions{})
+	nodes, err := kc.k8sclient.CoreV1().Nodes().List(context.Background(), meta_v1.ListOptions{})
 	if err != nil {
 		return "", "", err
 	}
