@@ -433,10 +433,10 @@ func (cs *KscEBSControllerServer) ControllerExpandVolume(ctx context.Context, re
 		return nil, err
 	}
 
-	var expandVolResp *ebsClient.ExpandVolumeResp
 	if exVol.Size < capacity {
-		exVol.Size = capacity
-		if expandVolResp, err = cs.ebsClient.ExpandVolume(nil); err != nil {
+		var expandVolResp *ebsClient.ExpandVolumeResp
+		var expandVolReq = &ebsClient.ExpandVolumeReq{Size: capacity, OnlineResize: true, VolumeId: volID}
+		if expandVolResp, err = cs.ebsClient.ExpandVolume(expandVolReq); err != nil {
 			glog.Infof("Expand volume-%s failed response: %s , error: %s", volID, expandVolResp, err)
 			return nil, err
 		} else {

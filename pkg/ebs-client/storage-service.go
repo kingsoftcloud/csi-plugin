@@ -174,6 +174,8 @@ func (ev *ExpandVolumeReq) ToQuery() string {
 	querySlice := []string{"Action=ResizeVolume"}
 	querySlice = append(querySlice, fmt.Sprintf("VolumeId=%s", ev.VolumeId))
 	querySlice = append(querySlice, fmt.Sprintf("Size=%d", ev.Size))
+	querySlice = append(querySlice, fmt.Sprintf("OnlineResize=%t", ev.OnlineResize))
+
 	return strings.Join(querySlice, Separator)
 }
 
