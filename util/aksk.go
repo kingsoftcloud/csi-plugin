@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/golang/glog"
@@ -28,7 +29,7 @@ func InitAksk(k8sclient *k8sclient.Clientset) {
 }
 
 func GetAKSK() (AKSK, error) {
-	cm, err := aksk.K8sclient.CoreV1().ConfigMaps(Namespace).Get(ConfigMapName, v1.GetOptions{})
+	cm, err := aksk.K8sclient.CoreV1().ConfigMaps(Namespace).Get(context.Background(), ConfigMapName, v1.GetOptions{})
 	if err != nil {
 		glog.Errorf("get configmap %v: %v", ConfigMapName, err)
 		return aksk, err
