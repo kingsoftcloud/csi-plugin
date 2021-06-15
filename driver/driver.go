@@ -29,17 +29,19 @@ type Driver struct {
 	nodeServer       csi.NodeServer
 }
 
-type DriverConfig struct {
-	ControllerServer bool
-	NodeServer       bool
-	EndPoint         string
-	DriverName       string
-	Version          string
-	EbsClient        ebsClient.StorageService
-	K8sclient        *k8sclient.Clientset
+type Config struct {
+	Version                string
+	EndPoint               string
+	DriverName             string
+	EnableNodeServer       bool
+	EnableControllerServer bool
+	EnableVolumeExpansion  bool
+	MaxVolumeSize          int64
+	EbsClient              ebsClient.StorageService
+	K8sClient              *k8sclient.Clientset
 }
 
-func NewDriver(config *DriverConfig) *Driver {
+func NewDriver(config *Config) *Driver {
 	if config.DriverName == "" {
 		glog.Errorf("Driver name missing")
 		return nil
@@ -56,10 +58,10 @@ func NewDriver(config *DriverConfig) *Driver {
 		nodeServer:       nil,
 		ready:            false,
 	}
-	if config.ControllerServer {
+	if config.EnableControllerServer {
 		driver.controllerServer = GetControllerServer(config)
 	}
-	if config.NodeServer {
+	if config.EnableNodeServer {
 		driver.nodeServer = GetNodeServer(config)
 	}
 

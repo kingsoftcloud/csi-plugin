@@ -4,6 +4,7 @@ import (
 	ebsClient "csi-plugin/pkg/ebs-client"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"strconv"
@@ -35,22 +36,67 @@ const (
 	defaultPurchaseTime = "1"
 )
 
-type ControllerServer struct {
-	driverName string
+type KscEBSControllerServer struct {
+	config Config
 
+	mutex     sync.Mutex
+	k8sClient K8sClientWrapper
 	ebsClient ebsClient.StorageService
-	k8sclient K8sClientWrapper
 }
 
-func GetControllerServer(config *DriverConfig) *ControllerServer {
-	return &ControllerServer{
-		driverName: config.DriverName,
-		ebsClient:  config.EbsClient,
-		k8sclient:  GetK8sClientWrapper(config.K8sclient),
+func GetControllerServer(cfg *Config) *KscEBSControllerServer {
+	return &KscEBSControllerServer{
+		config:    *cfg,
+		ebsClient: cfg.EbsClient,
+		k8sClient: GetK8sClientWrapper(cfg.K8sClient),
 	}
 }
 
-func (d *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+func (cs *KscEBSControllerServer) getControllerServiceCapabilities() []*csi.ControllerServiceCapability {
+	var cl []csi.ControllerServiceCapability_RPC_Type
+
+	cl = []csi.ControllerServiceCapability_RPC_Type{
+		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
+		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
+		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
+	}
+	if cs.config.EnableVolumeExpansion {
+		cl = append(cl, csi.ControllerServiceCapability_RPC_EXPAND_VOLUME)
+	}
+
+	var csc []*csi.ControllerServiceCapability
+
+	for _, cap := range cl {
+		csc = append(csc, &csi.ControllerServiceCapability{
+			Type: &csi.ControllerServiceCapability_Rpc{
+				Rpc: &csi.ControllerServiceCapability_RPC{
+					Type: cap,
+				},
+			},
+		})
+	}
+
+	return csc
+}
+
+func (cs *KscEBSControllerServer) validateControllerServiceRequest(c csi.ControllerServiceCapability_RPC_Type) error {
+	if c == csi.ControllerServiceCapability_RPC_UNKNOWN {
+		return nil
+	}
+
+	for _, cap := range cs.getControllerServiceCapabilities() {
+		if c == cap.GetRpc().GetType() {
+			return nil
+		}
+	}
+	return status.Errorf(codes.InvalidArgument, "unsupported capability %s", c)
+}
+
+func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+	if err := cs.validateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
+		glog.V(3).Infof("invalid create volume req: %v", req)
+		return nil, err
+	}
 	// check parameters
 	if req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "Volume name must be provided")
@@ -60,7 +106,7 @@ func (d *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	}
 
 	if !validateCapabilities(req.VolumeCapabilities) {
-		return nil, status.Error(codes.InvalidArgument, "invalid volume capabilities requested. Only SINGLE_NODE_WRITER is supported ('accessModes.ReadWriteOnce' on Kubernetes)")
+		return nil, status.Error(codes.InvalidArgument, "invalid volume capabilities requestecs . Only SINGLE_NODE_WRITER is supported ('accessModes.ReadWriteOnce' on Kubernetes)")
 	}
 
 	size, err := extractStorage(req.CapacityRange)
@@ -70,7 +116,7 @@ func (d *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
 	volumeName := req.Name
 	// get volume first, if it's created do no thing
-	listVolumesResp, err := d.ebsClient.ListVolumes(&ebsClient.ListVolumesReq{})
+	listVolumesResp, err := cs.ebsClient.ListVolumes(&ebsClient.ListVolumesReq{})
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +154,7 @@ func (d *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	region := parameters.Get("region", "")
 	zone := parameters.Get("zone", "")
 	if region == "" || zone == "" {
-		region, zone, err = d.k8sclient.GetNodeReginZone()
+		region, zone, err = cs.k8sClient.GetNodeRegionZone()
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +179,7 @@ func (d *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 		createVolumeReq.PurchaseTime = purchaseTime
 	}
 
-	createVolumeResp, err := d.ebsClient.CreateVolume(createVolumeReq)
+	createVolumeResp, err := cs.ebsClient.CreateVolume(createVolumeReq)
 	if err != nil {
 		return nil, err
 	}
@@ -156,14 +202,20 @@ func (d *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 	return resp, nil
 }
 
-func (d *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+func (cs *KscEBSControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+	if err := cs.validateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
+		glog.V(3).Infof("invalid delete volume req: %v", req)
+		return nil, err
+	}
+
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "DeleteVolume Volume ID must be provided")
 	}
+
 	deleteVolumeReq := &ebsClient.DeleteVolumeReq{
 		VolumeId: req.VolumeId,
 	}
-	_, err := d.ebsClient.DeleteVolume(deleteVolumeReq)
+	_, err := cs.ebsClient.DeleteVolume(deleteVolumeReq)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +223,7 @@ func (d *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 }
 
 // ControllerUnpublishVolume deattaches the given volume from the node
-func (d *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+func (cs *KscEBSControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Volume ID must be provided")
 	}
@@ -183,7 +235,7 @@ func (d *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 	listVolumesReq := &ebsClient.ListVolumesReq{
 		VolumeIds: []string{req.VolumeId},
 	}
-	_, err := d.ebsClient.GetVolume(listVolumesReq)
+	_, err := cs.ebsClient.GetVolume(listVolumesReq)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, err.Error())
 	}
@@ -192,7 +244,7 @@ func (d *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 		req.VolumeId,
 		req.NodeId,
 	}
-	if _, err := d.ebsClient.Detach(detachVolumeReq); err != nil {
+	if _, err := cs.ebsClient.Detach(detachVolumeReq); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	glog.Info("volume is detached")
@@ -201,8 +253,8 @@ func (d *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
 }
 
 // ControllerPublishVolume attaches the given volume to the node
-func (d *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	publishInfoVolumeName := d.driverName + "/volume-name"
+func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+	publishInfoVolumeName := cs.config.DriverName + "/volume-name"
 
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Volume ID must be provided")
@@ -228,7 +280,7 @@ func (d *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	listVolumesReq := &ebsClient.ListVolumesReq{
 		VolumeIds: []string{req.VolumeId},
 	}
-	vol, err := d.ebsClient.GetVolume(listVolumesReq)
+	vol, err := cs.ebsClient.GetVolume(listVolumesReq)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, err.Error())
 	}
@@ -252,7 +304,7 @@ func (d *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}
 
 	// validate attach instance
-	validateAttachInstanceResp, err := d.ebsClient.ValidateAttachInstance(&ebsClient.ValidateAttachInstanceReq{
+	validateAttachInstanceResp, err := cs.ebsClient.ValidateAttachInstance(&ebsClient.ValidateAttachInstanceReq{
 		VolumeType: vol.VolumeType,
 		InstanceId: req.NodeId,
 	})
@@ -265,7 +317,7 @@ func (d *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 
 	// waiting until volume is available
 	if vol.VolumeStatus != ebsClient.AVAILABLE_STATUS {
-		if err := ebsClient.WaitVolumeStatus(d.ebsClient, vol.VolumeId, ebsClient.AVAILABLE_STATUS); err != nil {
+		if err := ebsClient.WaitVolumeStatus(cs.ebsClient, vol.VolumeId, ebsClient.AVAILABLE_STATUS); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -275,15 +327,15 @@ func (d *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 		VolumeId:   req.VolumeId,
 		InstanceId: req.NodeId,
 	}
-	if _, err := d.ebsClient.Attach(attachVolumeReq); err != nil {
+	if _, err := cs.ebsClient.Attach(attachVolumeReq); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	// waiting until volume is attached
-	if err := ebsClient.WaitVolumeStatus(d.ebsClient, req.VolumeId, ebsClient.INUSE_STATUS); err != nil {
+	if err := ebsClient.WaitVolumeStatus(cs.ebsClient, req.VolumeId, ebsClient.INUSE_STATUS); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	glog.Info("volume attaced")
+	glog.Info("volume attached")
 	return &csi.ControllerPublishVolumeResponse{
 		PublishContext: map[string]string{
 			publishInfoVolumeName: vol.VolumeName,
@@ -291,7 +343,7 @@ func (d *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
 	}, nil
 }
 
-func (d *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
+func (cs *KscEBSControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "ValidateVolumeCapabilities Volume ID must be provided")
 	}
@@ -300,13 +352,13 @@ func (d *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *
 		return nil, status.Error(codes.InvalidArgument, "ValidateVolumeCapabilities Volume Capabilities must be provided")
 	}
 	if !validateCapabilities(req.VolumeCapabilities) {
-		return nil, status.Error(codes.InvalidArgument, "invalid volume capabilities requested. Only SINGLE_NODE_WRITER is supported ('accessModes.ReadWriteOnce' on Kubernetes)")
+		return nil, status.Error(codes.InvalidArgument, "invalid volume capabilities requestecs . Only SINGLE_NODE_WRITER is supported ('accessModes.ReadWriteOnce' on Kubernetes)")
 	}
 
 	listVolumesReq := &ebsClient.ListVolumesReq{
 		VolumeIds: []string{req.VolumeId},
 	}
-	_, err := d.ebsClient.GetVolume(listVolumesReq)
+	_, err := cs.ebsClient.GetVolume(listVolumesReq)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, err.Error())
 	}
@@ -321,8 +373,8 @@ func (d *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *
 	return resp, nil
 }
 
-func (d *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
-	listVolumesResp, err := d.ebsClient.ListVolumes(&ebsClient.ListVolumesReq{})
+func (cs *KscEBSControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
+	listVolumesResp, err := cs.ebsClient.ListVolumes(&ebsClient.ListVolumesReq{})
 	if err != nil {
 		return nil, err
 	}
@@ -348,59 +400,87 @@ func (d *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumes
 	return resp, nil
 }
 
-func (d *ControllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
+func (cs *KscEBSControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	if !cs.config.EnableVolumeExpansion {
+		return nil, status.Error(codes.Unimplemented, "ControllerExpandVolume is not supported")
+	}
+	volID := req.GetVolumeId()
+	if len(volID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+	}
 
-func (d *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
-	newCap := func(cap csi.ControllerServiceCapability_RPC_Type) *csi.ControllerServiceCapability {
-		return &csi.ControllerServiceCapability{
-			Type: &csi.ControllerServiceCapability_Rpc{
-				Rpc: &csi.ControllerServiceCapability_RPC{
-					Type: cap,
-				},
-			},
+	capRange := req.GetCapacityRange()
+	if capRange == nil {
+		return nil, status.Error(codes.InvalidArgument, "Capacity range not provided")
+	}
+
+	capacity := int64(capRange.GetRequiredBytes())
+	if capacity > cs.config.MaxVolumeSize {
+		return nil, status.Errorf(codes.OutOfRange, "Requested capacity %d exceeds maximum allowed %d", capacity, cs.config.MaxVolumeSize)
+	}
+
+	// Lock before acting on global state. A production-quality
+	// driver might use more fine-grained locking.
+	cs.mutex.Lock()
+	defer cs.mutex.Unlock()
+
+	listVolumesReq := &ebsClient.ListVolumesReq{
+		VolumeIds: []string{volID},
+	}
+
+	exVol, err := cs.ebsClient.GetVolume(listVolumesReq)
+	if err != nil {
+		return nil, err
+	}
+
+	var expandVolResp *ebsClient.ExpandVolumeResp
+	if exVol.Size < capacity {
+		exVol.Size = capacity
+		//TODO
+		if expandVolResp, err = cs.ebsClient.ExpandVolume(nil); err != nil {
+			glog.Infof("Expand volume-%s failed response: %s , error: %s", volID, expandVolResp, err)
+			return nil, err
+		} else {
+			glog.Info("volume-%s expand success.", volID)
 		}
 	}
 
-	var caps []*csi.ControllerServiceCapability
-	for _, csCap := range []csi.ControllerServiceCapability_RPC_Type{
-		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
-		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
-		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
-	} {
-		caps = append(caps, newCap(csCap))
-	}
+	return &csi.ControllerExpandVolumeResponse{
+		CapacityBytes:         exVol.Size,
+		NodeExpansionRequired: true,
+	}, nil
+}
 
+func (cs *KscEBSControllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (cs *KscEBSControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	resp := &csi.ControllerGetCapabilitiesResponse{
-		Capabilities: caps,
+		Capabilities: cs.getControllerServiceCapabilities(),
 	}
 
 	return resp, nil
 }
 
-func (d *ControllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
+func (cs *KscEBSControllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (d *ControllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
+func (cs *KscEBSControllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (d *ControllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
+func (cs *KscEBSControllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
-func (d *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
-}
-
-func (d *ControllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+func (cs *KscEBSControllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
 type K8sClientWrapper interface {
-	GetNodeReginZone() (string, string, error)
+	GetNodeRegionZone() (string, string, error)
 }
 
 type K8sClientWrap struct {
@@ -413,7 +493,7 @@ func GetK8sClientWrapper(k8sclient *k8sclient.Clientset) K8sClientWrapper {
 	}
 }
 
-func (kc *K8sClientWrap) GetNodeReginZone() (string, string, error) {
+func (kc *K8sClientWrap) GetNodeRegionZone() (string, string, error) {
 	var randNode k8s_v1.Node
 
 	nodes, err := kc.k8sclient.CoreV1().Nodes().List(context.Background(), meta_v1.ListOptions{})

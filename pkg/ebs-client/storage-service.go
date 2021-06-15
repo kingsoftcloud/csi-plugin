@@ -6,10 +6,11 @@ import (
 )
 
 type StorageService interface {
-	ListVolumes(*ListVolumesReq) (*ListVolumesResp, error)
 	GetVolume(*ListVolumesReq) (*Volume, error)
+	ListVolumes(*ListVolumesReq) (*ListVolumesResp, error)
 	CreateVolume(*CreateVolumeReq) (*CreateVolumeResp, error)
 	DeleteVolume(*DeleteVolumeReq) (*DeleteVolumeResp, error)
+	ExpandVolume(*ExpandVolumeReq) (*ExpandVolumeResp, error)
 
 	Attach(*AttachVolumeReq) (*AttachVolumeResp, error)
 	Detach(*DetachVolumeReq) (*DetachVolumeResp, error)
@@ -155,6 +156,12 @@ func (dv *DeleteVolumeReq) ToQuery() string {
 type DeleteVolumeResp struct {
 	RequestId string `json:"RequestId"`
 	Return    bool   `json:"Return"`
+}
+
+type ExpandVolumeReq struct {
+}
+
+type ExpandVolumeResp struct {
 }
 
 type ListVolumesReq struct {

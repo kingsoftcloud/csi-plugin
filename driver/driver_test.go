@@ -35,7 +35,7 @@ type fakeNodeServer struct {
 	*NodeServer
 }
 
-func getNodeServer(config *DriverConfig) *fakeNodeServer {
+func getNodeServer(config *Config) *fakeNodeServer {
 	nodeServer := &fakeNodeServer{
 		NodeServer: &NodeServer{
 			driverName: config.DriverName,
@@ -48,16 +48,15 @@ func getNodeServer(config *DriverConfig) *fakeNodeServer {
 }
 
 type fakeControllerServer struct {
-	*ControllerServer
+	*KscEBSControllerServer
 }
 
-func getControllerServer(config *DriverConfig) *fakeControllerServer {
+func getControllerServer(config *Config) *fakeControllerServer {
 	return &fakeControllerServer{
-		ControllerServer: &ControllerServer{
-			driverName: config.DriverName,
-			ebsClient:  config.EbsClient,
+		KscEBSControllerServer: &KscEBSControllerServer{
+			ebsClient: config.EbsClient,
 			// kecClient:  config.KecClient,
-			k8sclient: &fakeK8sClientWrap{},
+			k8sClient: &fakeK8sClientWrap{},
 		},
 	}
 }
@@ -70,7 +69,7 @@ type fakeIdentityServer struct {
 	*IdentityServer
 }
 
-func getIdentityServer(config *DriverConfig) *fakeIdentityServer {
+func getIdentityServer(config *Config) *fakeIdentityServer {
 	return &fakeIdentityServer{
 		IdentityServer: &IdentityServer{
 			driverName: config.DriverName,
@@ -81,7 +80,7 @@ func getIdentityServer(config *DriverConfig) *fakeIdentityServer {
 
 type fakeK8sClientWrap struct{}
 
-func (fk *fakeK8sClientWrap) GetNodeReginZone() (string, string, error) {
+func (fk *fakeK8sClientWrap) GetNodeRegionZone() (string, string, error) {
 	return "test-region", "test-zone", nil
 }
 
@@ -90,7 +89,7 @@ func getDriver(t *testing.T) *Driver {
 		t.Fatalf("failed to remove unix domain socket file %s, error: %s", socket, err)
 	}
 
-	driverConfig := &DriverConfig{
+	driverConfig := &Config{
 		EndPoint:   endpoint,
 		DriverName: driverName,
 		Version:    version,
@@ -144,6 +143,19 @@ func NewFakeStorageClient() *FakeStorageClient {
 	return &FakeStorageClient{
 		volumes: volumes,
 	}
+}
+
+//TODO
+func (cli *FakeStorageClient) ExpandVolume(expandVolumeReq *ebsClient.ExpandVolumeReq) (*ebsClient.ExpandVolumeResp, error) {
+	return nil, nil
+	//listVolumesResp, err := cli.ListVolumes(expandVolumeReq)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if len(listVolumesResp.Volumes) == 0 {
+	//	return nil, errors.New("not found volume")
+	//}
+	//return listVolumesResp.Volumes[0], nil
 }
 
 func (f *FakeStorageClient) ListVolumes(listVolumesReq *ebsClient.ListVolumesReq) (*ebsClient.ListVolumesResp, error) {

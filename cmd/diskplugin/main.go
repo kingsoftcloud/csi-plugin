@@ -97,17 +97,18 @@ func getDriver() *driver.Driver {
 		Region:          ci.Region,
 	}
 
-	driverConfig := &driver.DriverConfig{
-		EndPoint:         *endpoint,
-		ControllerServer: *controllerServer,
-		NodeServer:       *nodeServer,
-		DriverName:       driverName,
-		Version:          version,
-		EbsClient:        ebsClient.New(OpenApiConfig),
-		K8sclient:        new_k8sclient(),
+	cfg := &driver.Config{
+		EndPoint:               *endpoint,
+		EnableNodeServer:       *nodeServer,
+		EnableControllerServer: *controllerServer,
+		DriverName:             driverName,
+		K8sClient:              new_k8sclient(),
+		EbsClient:              ebsClient.New(OpenApiConfig),
+
+		Version: version,
 	}
 
-	return driver.NewDriver(driverConfig)
+	return driver.NewDriver(cfg)
 }
 
 func main() {

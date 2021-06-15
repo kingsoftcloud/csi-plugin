@@ -12,7 +12,7 @@ type IdentityServer struct {
 	ready      bool
 }
 
-func GetIdentityServer(config *DriverConfig) *IdentityServer {
+func GetIdentityServer(config *Config) *IdentityServer {
 	return &IdentityServer{
 		driverName: config.DriverName,
 		version:    config.Version,

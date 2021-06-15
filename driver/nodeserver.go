@@ -30,7 +30,7 @@ type NodeServer struct {
 	mounter    Mounter
 }
 
-func GetNodeServer(config *DriverConfig) *NodeServer {
+func GetNodeServer(config *Config) *NodeServer {
 	nodeName := os.Getenv("KUBE_NODE_NAME")
 	if nodeName == "" {
 		panic(errors.New("nodename is empty"))
@@ -49,7 +49,7 @@ func GetNodeServer(config *DriverConfig) *NodeServer {
 		mounter:    newMounter(),
 	}
 
-	k8sCli := config.K8sclient
+	k8sCli := config.K8sClient
 	node, err := k8sCli.CoreV1().Nodes().Get(context.Background(), nodeName, meta_v1.GetOptions{})
 	if err != nil {
 		panic(err)
@@ -245,7 +245,7 @@ func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 }
 
 func (d *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	// currently there is a single NodeServer capability according to the spec
+	// currently there is a single EnableNodeServer capability according to the spec
 	nscap := &csi.NodeServiceCapability{
 		Type: &csi.NodeServiceCapability_Rpc{
 			Rpc: &csi.NodeServiceCapability_RPC{
@@ -278,7 +278,7 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 
 //
 //// NodeExpandVolume is only implemented so the driver can be used for e2e testing.
-//func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+//func (d *EnableNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 //	if !hp.config.EnableVolumeExpansion {
 //		return nil, status.Error(codes.Unimplemented, "NodeExpandVolume is not supported")
 //	}
