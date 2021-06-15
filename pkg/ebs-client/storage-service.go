@@ -159,9 +159,22 @@ type DeleteVolumeResp struct {
 }
 
 type ExpandVolumeReq struct {
+	RequestId    string `json:"RequestId"`
+	VolumeId     string `json:"VolumeId"`
+	Size         int64  `json:"Size"` //GB
+	OnlineResize bool   `json:"OnlineResize"`
 }
 
 type ExpandVolumeResp struct {
+	RequestId string `json:"RequestId"`
+	Return    bool   `json:"Return"`
+}
+
+func (ev *ExpandVolumeReq) ToQuery() string {
+	querySlice := []string{"Action=ResizeVolume"}
+	querySlice = append(querySlice, fmt.Sprintf("VolumeId=%s", ev.VolumeId))
+	querySlice = append(querySlice, fmt.Sprintf("Size=%d", ev.Size))
+	return strings.Join(querySlice, Separator)
 }
 
 type ListVolumesReq struct {

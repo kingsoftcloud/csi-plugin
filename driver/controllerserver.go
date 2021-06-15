@@ -414,7 +414,7 @@ func (cs *KscEBSControllerServer) ControllerExpandVolume(ctx context.Context, re
 		return nil, status.Error(codes.InvalidArgument, "Capacity range not provided")
 	}
 
-	capacity := int64(capRange.GetRequiredBytes())
+	capacity := int64(capRange.GetRequiredBytes()) / 1024 / 1024
 	if capacity > cs.config.MaxVolumeSize {
 		return nil, status.Errorf(codes.OutOfRange, "Requested capacity %d exceeds maximum allowed %d", capacity, cs.config.MaxVolumeSize)
 	}
@@ -436,12 +436,11 @@ func (cs *KscEBSControllerServer) ControllerExpandVolume(ctx context.Context, re
 	var expandVolResp *ebsClient.ExpandVolumeResp
 	if exVol.Size < capacity {
 		exVol.Size = capacity
-		//TODO
 		if expandVolResp, err = cs.ebsClient.ExpandVolume(nil); err != nil {
 			glog.Infof("Expand volume-%s failed response: %s , error: %s", volID, expandVolResp, err)
 			return nil, err
 		} else {
-			glog.Info("volume-%s expand success.", volID)
+			glog.Info("volume-%s expanded success.", volID)
 		}
 	}
 

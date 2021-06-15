@@ -106,15 +106,17 @@ func (cli *Client) GetVolume(listVolumesReq *ListVolumesReq) (*Volume, error) {
 
 //TODO
 func (cli *Client) ExpandVolume(expandVolumeReq *ExpandVolumeReq) (*ExpandVolumeResp, error) {
-	return nil, nil
-	//listVolumesResp, err := cli.ListVolumes(expandVolumeReq)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//if len(listVolumesResp.Volumes) == 0 {
-	//	return nil, errors.New("not found volume")
-	//}
-	//return listVolumesResp.Volumes[0], nil
+	query := expandVolumeReq.ToQuery()
+	resp, err := cli.DoRequest(serviceName, query)
+	if err != nil {
+		return nil, err
+	}
+	expandVolumeResp := &ExpandVolumeResp{}
+	if err := json.Unmarshal(resp, expandVolumeResp); err != nil {
+		return nil, err
+	}
+
+	return expandVolumeResp, nil
 }
 
 func (cli *Client) Attach(attachVolumeReq *AttachVolumeReq) (*AttachVolumeResp, error) {

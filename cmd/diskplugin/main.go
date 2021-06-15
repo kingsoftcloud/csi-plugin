@@ -31,6 +31,9 @@ var (
 	controllerServer = flag.Bool("controller-server", false, "value: controller-server=true|false")
 	nodeServer       = flag.Bool("node-server", false, "value: node-server=true|false")
 
+	volumeExpansion = flag.Bool("node-expand-required", true, "Enables NodeServiceCapability_RPC_EXPAND_VOLUME capacity.")
+	maxVolumeSize   = flag.Int64("max-volume-size", 16000, "maximum size of volumes in GB (inclusive)")
+
 	accessKeyId     = flag.String("access-key-id", "", "")
 	accessKeySecret = flag.String("access-key-secret", "", "")
 
@@ -101,6 +104,8 @@ func getDriver() *driver.Driver {
 		EndPoint:               *endpoint,
 		EnableNodeServer:       *nodeServer,
 		EnableControllerServer: *controllerServer,
+		EnableVolumeExpansion:  *volumeExpansion,
+		MaxVolumeSize:          *maxVolumeSize,
 		DriverName:             driverName,
 		K8sClient:              new_k8sclient(),
 		EbsClient:              ebsClient.New(OpenApiConfig),
