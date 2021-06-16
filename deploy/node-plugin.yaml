@@ -39,9 +39,9 @@ spec:
                   fieldPath: spec.nodeName
           volumeMounts:
             - name: plugin-dir
-              mountPath: /csi/
+              mountPath: /csi
             - name: registration-dir
-              mountPath: /registration/
+              mountPath: /registration
         - name: csi-diskplugin
           image: hub.kce.ksyun.com/ksyun/csi-diskplugin:t1.4.1-amd64
           args :

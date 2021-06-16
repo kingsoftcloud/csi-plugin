@@ -1,0 +1,14 @@
+apiVersion: storage.k8s.io/v1
+kind: CSINode
+metadata:
+  name: 192.168.11.112
+  ownerReferences:
+    - apiVersion: v1
+      kind: Node
+      name: 192.168.11.112
+      uid: 377e646d-7fa4-4cf6-97c6-c4b64e19777f
+spec:
+  drivers:
+    - name: com.ksc.csi.diskplugin
+      nodeID: 192.168.11.112
+      topologyKeys: null

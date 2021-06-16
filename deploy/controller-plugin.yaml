@@ -25,10 +25,9 @@ spec:
       serviceAccount: csi-controller-sa
       containers:
         - name: csi-provisioner
-          image: hub.kce.ksyun.com/ksyun/csi-provisioner:v0.4.2
+          image: hub.kce.ksyun.com/ksyun/csi-provisioner:v2.2.2
           args:
-            - "--provisioner=com.ksc.csi.diskplugin"
-            - "--feature-gates=Topology=true"
+            - "--feature-gates=Topology=false"
             - "--csi-address=$(ADDRESS)"
             - "--v=5"
           env:
@@ -132,13 +131,13 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["persistentvolumes"]
-    verbs: ["get", "list", "watch", "update"]
+    verbs: ["get", "list", "watch", "update", "patch"]
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
-    resources: ["volumeattachments", "csinodes"]
-    verbs: ["get", "list", "watch", "update"]
+    resources: ["volumeattachments", "csinodes", "volumeattachments/status"]
+    verbs: ["get", "list", "watch", "update", "patch"]
 
 ---
 
