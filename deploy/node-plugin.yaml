@@ -32,7 +32,7 @@ spec:
             - name: ADDRESS
               value: /csi/csi.sock
             - name: DRIVER_REG_SOCK_PATH
-              value: /data/kubelet/plugins/com.ksc.csi.diskplugin/csi.sock
+              value: /data/kubelet/plugins_registry/com.ksc.csi.diskplugin/csi.sock
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
@@ -78,11 +78,11 @@ spec:
       volumes:
         - name: registration-dir
           hostPath:
-            path: /data/kubelet/plugins/
+            path: /data/kubelet/plugins_registry/
             type: DirectoryOrCreate
         - name: plugin-dir
           hostPath:
-            path: /data/kubelet/plugins/com.ksc.csi.diskplugin
+            path: /data/kubelet/plugins_registry/com.ksc.csi.diskplugin
             type: DirectoryOrCreate
         - name: pods-mount-dir
           hostPath:
