@@ -445,7 +445,7 @@ func (cs *KscEBSControllerServer) ControllerExpandVolume(ctx context.Context, re
 	}
 
 	return &csi.ControllerExpandVolumeResponse{
-		CapacityBytes:         exVol.Size * 1024 * 1024 * 1024,
+		CapacityBytes:         capacity,
 		NodeExpansionRequired: true,
 	}, nil
 }
