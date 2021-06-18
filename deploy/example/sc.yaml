@@ -3,6 +3,7 @@ kind: StorageClass
 metadata:
   name: test-csi-provisioner
 provisioner: com.ksc.csi.diskplugin
+allowVolumeExpansion: true
 parameters:
   type: SSD3.0
   # region: cn-beijing-6
