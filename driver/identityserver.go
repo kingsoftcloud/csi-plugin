@@ -2,7 +2,6 @@ package driver
 
 import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/protobuf/ptypes/wrappers"
 	"golang.org/x/net/context"
 )
 
@@ -50,5 +49,5 @@ func (d *IdentityServer) GetPluginCapabilities(ctx context.Context, req *csi.Get
 }
 
 func (d *IdentityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	return &csi.ProbeResponse{Ready: &wrappers.BoolValue{Value: d.ready}}, nil
+	return &csi.ProbeResponse{}, nil
 }
