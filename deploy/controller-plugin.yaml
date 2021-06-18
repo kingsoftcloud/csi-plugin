@@ -27,7 +27,8 @@ spec:
         - name: csi-provisioner
           image: hub.kce.ksyun.com/ksyun/csi-provisioner:v2.2.2
           args:
-            - "--feature-gates=Topology=false"
+            - "--feature-gates=Topology=true"
+            #- "--node-deployment=true"
             - "--csi-address=$(ADDRESS)"
             - "--v=5"
           env:
@@ -62,7 +63,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-diskplugin
-          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:t1.4.1-amd64
+          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:t1.4.3-amd64
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--controller-server=true"
@@ -71,6 +72,11 @@ spec:
           env:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
           imagePullPolicy: "Always"
           volumeMounts:
             - name: socket-dir

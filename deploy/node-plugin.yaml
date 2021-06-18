@@ -26,8 +26,9 @@ spec:
           image: hub.kce.ksyun.com/ksyun/csi-node-driver-registrar:v2.2.0
           args:
             - "--v=5"
-            - "--csi-address=$(ADDRESS)"
-            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+            - "--csi-address=/csi/csi.sock"
+            - "--plugin-registration-path=/registration"
+            - "--kubelet-registration-path=/data/kubelet/plugins_registry/com.ksc.csi.diskplugin/csi.sock"
           env:
             - name: ADDRESS
               value: /csi/csi.sock
@@ -43,7 +44,7 @@ spec:
             - name: registration-dir
               mountPath: /registration
         - name: csi-diskplugin
-          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:t1.4.1-amd64
+          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:t1.4.3-amd64
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--node-server=true"
@@ -67,7 +68,7 @@ spec:
             - name: plugin-dir
               mountPath: /csi
             - name: pods-mount-dir
-              mountPath: /data/kubelet
+              mountPath: /data/kubelet/
               # needed so that any mounts setup inside this container are
               # propagated back to the host machine.
               mountPropagation: "Bidirectional"
@@ -79,18 +80,18 @@ spec:
         - name: registration-dir
           hostPath:
             path: /data/kubelet/plugins_registry/
-            type: DirectoryOrCreate
+            type: Directory
         - name: plugin-dir
           hostPath:
-            path: /data/kubelet/plugins_registry/com.ksc.csi.diskplugin
+            path: /data/kubelet/plugins_registry/com.ksc.csi.diskplugin/
             type: DirectoryOrCreate
         - name: pods-mount-dir
           hostPath:
-            path: /data/kubelet
+            path: /data/kubelet/
             type: Directory
         - name: device-dir
           hostPath:
-            path: /dev
+            path: /dev/
         - name: cluster-info-dir
           hostPath:
             path: /opt/app-agent/arrangement
