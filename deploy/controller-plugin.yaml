@@ -49,6 +49,18 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: csi-resizer
+          imagePullPolicy: "Always"
+          image: hub.kce.ksyun.com/ksyun/csi-resizer:v1.2.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-diskplugin
           image: hub.kce.ksyun.com/ksyun/csi-diskplugin:t1.4.1-amd64
           args :
@@ -88,11 +100,11 @@ metadata:
   name: csi-do-provisioner-role
 rules:
   - apiGroups: [""]
-    resources: ["secrets"]
+    resources: ["secrets", "pods"]
     verbs: ["get", "list"]
   - apiGroups: [""]
-    resources: ["persistentvolumes"]
-    verbs: ["get", "list", "watch", "create", "delete"]
+    resources: ["persistentvolumes", "persistentvolumeclaims/status"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch"]
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "update"]
