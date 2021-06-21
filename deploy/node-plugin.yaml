@@ -44,7 +44,7 @@ spec:
             - name: registration-dir
               mountPath: /registration
         - name: csi-diskplugin
-          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:t1.4.3-amd64
+          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:v0.2.0
           args :
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--node-server=true"

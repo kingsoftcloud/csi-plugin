@@ -1,9 +1,11 @@
 package driver
 
 import (
+	ebsClient "csi-plugin/pkg/ebs-client"
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
@@ -22,12 +24,15 @@ const (
 )
 
 type NodeServer struct {
-	driverName string
-	nodeName   string
-	nodeID     string
-	region     string
-	zone       string
-	mounter    Mounter
+	config Config
+
+	mutex     sync.Mutex
+	ebsClient ebsClient.StorageService
+	nodeName  string
+	nodeID    string
+	region    string
+	zone      string
+	mounter   Mounter
 }
 
 func GetNodeServer(config *Config) *NodeServer {
@@ -43,10 +48,9 @@ func GetNodeServer(config *Config) *NodeServer {
 	}
 
 	nodeServer := &NodeServer{
-		driverName: config.DriverName,
-		nodeName:   nodeName,
-		nodeID:     instanceUUID,
-		mounter:    newMounter(),
+		nodeName: nodeName,
+		nodeID:   instanceUUID,
+		mounter:  newMounter(),
 	}
 
 	k8sCli := config.K8sClient
@@ -61,8 +65,8 @@ func GetNodeServer(config *Config) *NodeServer {
 }
 
 func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	annNoFormatVolume := d.driverName + "/noformat"
-	publishInfoVolumeName := d.driverName + "/volume-name"
+	annNoFormatVolume := d.config.DriverName + "/noformat"
+	publishInfoVolumeName := d.config.DriverName + "/volume-name"
 
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume ID must be provided")
@@ -241,7 +245,52 @@ func (d *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVol
 }
 
 func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	if !d.config.EnableVolumeExpansion {
+		return nil, status.Error(codes.Unimplemented, "NodeExpandVolume is not supported")
+	}
+	volID := req.GetVolumeId()
+	if len(volID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+	}
+
+	capRange := req.GetCapacityRange()
+	if capRange == nil {
+		return nil, status.Error(codes.InvalidArgument, "Capacity range not provided")
+	}
+
+	capacity := int64(capRange.GetRequiredBytes()) / 1024 / 1024 / 1024
+	if capacity > d.config.MaxVolumeSize {
+		return nil, status.Errorf(codes.OutOfRange, "Requested capacity %d exceeds maximum allowed %d", capacity, d.config.MaxVolumeSize)
+	}
+
+	// Lock before acting on global state. A production-quality
+	// driver might use more fine-grained locking.
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	listVolumesReq := &ebsClient.ListVolumesReq{
+		VolumeIds: []string{volID},
+	}
+
+	exVol, err := d.ebsClient.GetVolume(listVolumesReq)
+	if err != nil {
+		return nil, err
+	}
+
+	if exVol.Size < capacity {
+		var expandVolResp *ebsClient.ExpandVolumeResp
+		var expandVolReq = &ebsClient.ExpandVolumeReq{Size: capacity, OnlineResize: true, VolumeId: volID}
+		if expandVolResp, err = d.ebsClient.ExpandVolume(expandVolReq); err != nil {
+			glog.Infof("Expand volume-%s failed response: %s , error: %s", volID, expandVolResp, err)
+			return nil, err
+		} else {
+			glog.Info("volume-%s expanded success.", volID)
+		}
+	}
+
+	return &csi.NodeExpandVolumeResponse{
+		CapacityBytes: capRange.GetRequiredBytes(),
+	}, nil
 }
 
 func (d *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
