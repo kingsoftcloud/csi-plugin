@@ -26,13 +26,12 @@ const (
 type NodeServer struct {
 	config Config
 
-	mutex     sync.Mutex
-	ebsClient ebsClient.StorageService
-	nodeName  string
-	nodeID    string
-	region    string
-	zone      string
-	mounter   Mounter
+	mutex    sync.Mutex
+	nodeName string
+	nodeID   string
+	region   string
+	zone     string
+	mounter  Mounter
 }
 
 func GetNodeServer(cfg *Config) *NodeServer {
@@ -273,7 +272,7 @@ func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 		VolumeIds: []string{volID},
 	}
 
-	exVol, err := d.ebsClient.GetVolume(listVolumesReq)
+	exVol, err := d.config.EbsClient.GetVolume(listVolumesReq)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +280,7 @@ func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 	if exVol.Size < capacity {
 		var expandVolResp *ebsClient.ExpandVolumeResp
 		var expandVolReq = &ebsClient.ExpandVolumeReq{Size: capacity, OnlineResize: true, VolumeId: volID}
-		if expandVolResp, err = d.ebsClient.ExpandVolume(expandVolReq); err != nil {
+		if expandVolResp, err = d.config.EbsClient.ExpandVolume(expandVolReq); err != nil {
 			glog.Infof("Expand volume-%s failed response: %s , error: %s", volID, expandVolResp, err)
 			return nil, err
 		} else {
