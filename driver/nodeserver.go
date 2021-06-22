@@ -295,19 +295,34 @@ func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 
 func (d *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	// currently there is a single EnableNodeServer capability according to the spec
-	nscap := &csi.NodeServiceCapability{
-		Type: &csi.NodeServiceCapability_Rpc{
-			Rpc: &csi.NodeServiceCapability_RPC{
-				Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
-			},
-		},
+	return &csi.NodeGetCapabilitiesResponse{
+		Capabilities: d.getNodeServiceCapabilities(),
+	}, nil
+}
+
+func (d *NodeServer) getNodeServiceCapabilities() []*csi.NodeServiceCapability {
+	var capabilityRpcTypes []csi.NodeServiceCapability_RPC_Type
+
+	capabilityRpcTypes = []csi.NodeServiceCapability_RPC_Type{
+		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+	}
+	if d.config.EnableVolumeExpansion {
+		capabilityRpcTypes = append(capabilityRpcTypes, csi.NodeServiceCapability_RPC_EXPAND_VOLUME)
 	}
 
-	return &csi.NodeGetCapabilitiesResponse{
-		Capabilities: []*csi.NodeServiceCapability{
-			nscap,
-		},
-	}, nil
+	var nodeServiceCapabilities []*csi.NodeServiceCapability
+
+	for _, one := range capabilityRpcTypes {
+		nodeServiceCapabilities = append(nodeServiceCapabilities, &csi.NodeServiceCapability{
+			Type: &csi.NodeServiceCapability_Rpc{
+				Rpc: &csi.NodeServiceCapability_RPC{
+					Type: one,
+				},
+			},
+		})
+	}
+
+	return nodeServiceCapabilities
 }
 
 func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
