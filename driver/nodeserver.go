@@ -35,7 +35,7 @@ type NodeServer struct {
 	mounter   Mounter
 }
 
-func GetNodeServer(config *Config) *NodeServer {
+func GetNodeServer(cfg *Config) *NodeServer {
 	nodeName := os.Getenv("KUBE_NODE_NAME")
 	if nodeName == "" {
 		panic(errors.New("nodename is empty"))
@@ -48,12 +48,13 @@ func GetNodeServer(config *Config) *NodeServer {
 	}
 
 	nodeServer := &NodeServer{
+		config:   *cfg,
 		nodeName: nodeName,
 		nodeID:   instanceUUID,
 		mounter:  newMounter(),
 	}
 
-	k8sCli := config.K8sClient
+	k8sCli := cfg.K8sClient
 	node, err := k8sCli.CoreV1().Nodes().Get(context.Background(), nodeName, meta_v1.GetOptions{})
 	if err != nil {
 		panic(err)
