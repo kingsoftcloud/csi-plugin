@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
+//	"strconv"
 	"time"
 
 	"regexp"
@@ -222,11 +222,13 @@ func ValidateCreateVolumeReq(req *CreateVolumeReq) error {
 	if !validateReqParams(ChargeTypeRegexp, req.ChargeType) {
 		return status.Errorf(codes.InvalidArgument, "ChargeType (%v) is invalid", req.ChargeType)
 	}
-	if req.ChargeType == MONTHLY_CHARGE_TYPE || req.ChargeType == DAILY_CHARGE_TYPE {
+/*
+	if req.PurchaseTime != 0 {
 		if !validateReqParams(PurchaseTimeRegexp, strconv.Itoa(req.PurchaseTime)) {
 			return status.Errorf(codes.InvalidArgument, "purchase time (%v) is invalid", req.PurchaseTime)
 		}
 	}
+*/
 	return nil
 }
 

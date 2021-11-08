@@ -117,7 +117,7 @@ func (cv *CreateVolumeReq) ToQuery() string {
 				continue
 			}
 			querySlice = append(querySlice, fmt.Sprintf("ChargeType=%v", cv.ChargeType))
-			if cv.ChargeType == MONTHLY_CHARGE_TYPE || cv.ChargeType == DAILY_CHARGE_TYPE {
+			if cv.PurchaseTime != 0 {
 				querySlice = append(querySlice, fmt.Sprintf("PurchaseTime=%v", cv.PurchaseTime))
 			}
 			break

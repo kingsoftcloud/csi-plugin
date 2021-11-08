@@ -39,7 +39,8 @@ var (
 
 	openApiEndpoint = flag.String("open-api-endpoint", "internal.api.ksyun.com", "")
 	openApiSchema   = flag.String("open-api-schema", "http", "")
-	clusterInfoPath = flag.String("cluster-info-path", "/opt/app-agent/arrangement/clusterinfo", "")
+        region          = flag.String("region", "cn-beijing-6", "")
+	//clusterInfoPath = flag.String("cluster-info-path", "/opt/app-agent/arrangement/clusterinfo", "")
 )
 
 func new_k8sclient() *k8sclient.Clientset {
@@ -86,18 +87,20 @@ func loadClusterInfo(clusterInfoPath string) (*ClusterInfo, error) {
 }
 
 func getDriver() *driver.Driver {
+/*
 	ci, err := loadClusterInfo(*clusterInfoPath)
 	if err != nil {
 		panic(err)
 	}
 	glog.Infof("cluster info: %v", ci)
+*/
 
 	OpenApiConfig := &api.ClientConfig{
 		AccessKeyId:     *accessKeyId,
 		AccessKeySecret: *accessKeySecret,
 		OpenApiEndpoint: *openApiEndpoint,
 		OpenApiPrefix:   *openApiSchema,
-		Region:          ci.Region,
+		Region:          *region,
 	}
 
 	cfg := &driver.Config{

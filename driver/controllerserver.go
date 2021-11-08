@@ -33,7 +33,7 @@ const (
 
 	defaultChargeType   = ebsClient.DAILY_CHARGE_TYPE
 	defaultVolumeType   = ebsClient.SSD3_0
-	defaultPurchaseTime = "1"
+	defaultPurchaseTime = "0"
 )
 
 type KscEBSControllerServer struct {
@@ -171,11 +171,11 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		ProjectId:        projectId,
 	}
 
-	if chargeType == ebsClient.DAILY_CHARGE_TYPE || chargeType == ebsClient.MONTHLY_CHARGE_TYPE {
-		purchaseTime, err := strconv.Atoi(parameters.Get("purchasetime", defaultPurchaseTime))
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
-		}
+	purchaseTime, err := strconv.Atoi(parameters.Get("purchasetime", defaultPurchaseTime))
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	} 
+	if purchaseTime != 0 {
 		createVolumeReq.PurchaseTime = purchaseTime
 	}
 
