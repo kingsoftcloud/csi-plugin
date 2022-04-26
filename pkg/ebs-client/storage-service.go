@@ -16,6 +16,7 @@ type StorageService interface {
 	Detach(*DetachVolumeReq) (*DetachVolumeResp, error)
 
 	ValidateAttachInstance(*ValidateAttachInstanceReq) (*ValidateAttachInstanceResp, error)
+	GetVolumeByName(*GetVolumesReq) ([]*Volume, error)
 }
 
 type VolumeStatusType string
@@ -187,6 +188,42 @@ type ListVolumesReq struct {
 	VolumeCreateDate string
 }
 
+type GetVolumesReq struct {
+	VolumeType     string
+	VolumeCategory string
+	VolumeStatus   string
+	VolumeName     string
+}
+
+func (lv *GetVolumesReq) ToQuery() string {
+	querySlice := []string{"Action=DescribeVolumes"}
+
+	for _, volumeCategory := range []string{DATA_VOlUME_CATE, SYSTEM_VOlUME_CATE} {
+		if lv.VolumeCategory != volumeCategory {
+			continue
+		}
+		querySlice = append(querySlice, fmt.Sprintf("VolumeCategory=%v", lv.VolumeCategory))
+		break
+	}
+	if lv.VolumeStatus != "" {
+		querySlice = append(querySlice, fmt.Sprintf("VolumeStatus=%v", lv.VolumeStatus))
+	}
+
+	for _, vt := range []string{
+		SSD2_0, SSD3_0, SATA2_0,
+	} {
+		if lv.VolumeType != vt {
+			continue
+		}
+		querySlice = append(querySlice, fmt.Sprintf("VolumeType=%v", lv.VolumeType))
+		break
+	}
+	if lv.VolumeName != "" {
+		querySlice = append(querySlice, fmt.Sprintf("VolumeName=%v", lv.VolumeName))
+	}
+	return strings.Join(querySlice, Separator)
+}
+
 func (lv *ListVolumesReq) ToQuery() string {
 	querySlice := []string{"Action=DescribeVolumes"}
 	if lv.VolumeIds != nil && len(lv.VolumeIds) > 0 {
@@ -224,7 +261,10 @@ type ListVolumesResp struct {
 	RequestId string    `json:"RequestId"`
 	Volumes   []*Volume `json:"Volumes"`
 }
-
+type GetVolumesResp struct {
+	RequestId string    `json:"RequestId"`
+	Volumes   []*Volume `json:"Volumes"`
+}
 type AttachVolumeReq struct {
 	VolumeId           string
 	InstanceId         string

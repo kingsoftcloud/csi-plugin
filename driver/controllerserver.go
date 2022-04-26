@@ -116,23 +116,25 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 
 	volumeName := req.Name
 	// get volume first, if it's created do no thing
-	listVolumesResp, err := cs.ebsClient.ListVolumes(&ebsClient.ListVolumesReq{})
+	listVolumesResp, err := cs.ebsClient.GetVolumeByName(&ebsClient.GetVolumesReq{
+		VolumeName:     volumeName,
+		VolumeCategory: "data",
+		//TODO
+		VolumeStatus: "unbind",
+	})
 	if err != nil {
 		return nil, err
 	}
-	filterVolumes := make([]*ebsClient.Volume, 0)
-	for _, volume := range listVolumesResp.Volumes {
-		if volumeName == volume.VolumeName {
-			filterVolumes = append(filterVolumes, volume)
-		}
-	}
 
 	// volume already exist, do nothing
-	if len(filterVolumes) != 0 {
-		if len(filterVolumes) > 1 {
+	if len(listVolumesResp) != 0 {
+
+		if len(listVolumesResp) > 1 {
+			// external-provisioner 调用了三次 rpc createvolume，第一次耗费在 listebs，然后创建一个ebs，第二次调用时
+			// 第一次的ebs 还没有创建出来，然后创建ebs，第三次调用后，第一次的。。
 			return nil, fmt.Errorf("fatal issue: duplicate volume %q exists", volumeName)
 		}
-		vol := filterVolumes[0]
+		vol := listVolumesResp[0]
 		if vol.Size*GB != size {
 			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("invalid option requested size: %d", size))
 		}
@@ -174,7 +176,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	purchaseTime, err := strconv.Atoi(parameters.Get("purchasetime", defaultPurchaseTime))
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
-	} 
+	}
 	if purchaseTime != 0 {
 		createVolumeReq.PurchaseTime = purchaseTime
 	}

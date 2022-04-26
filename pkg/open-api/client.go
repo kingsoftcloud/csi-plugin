@@ -73,6 +73,7 @@ func (cli *Client) buildRequestWithBodyReader(serviceName string, body io.Reader
 	req, _ := http.NewRequest("GET", endpoint, body)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("")
 
 	if bodyLen > 0 {
 		req.Header.Set("Content-Length", strconv.Itoa(bodyLen))
@@ -101,6 +102,7 @@ func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
 	req, body := cli.buildRequest(service, "")
 
 	req.Header.Set("X-Ksc-Security-Token", aksk.SecurityToken)
+
 	req.URL.RawQuery = query
 	_, err := s.Sign(req, body, service, cli.region, time.Now())
 	if err != nil {

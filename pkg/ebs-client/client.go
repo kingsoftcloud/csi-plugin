@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-//	"strconv"
+
+	//	"strconv"
 	"time"
 
 	"regexp"
@@ -102,6 +103,24 @@ func (cli *Client) GetVolume(listVolumesReq *ListVolumesReq) (*Volume, error) {
 		return nil, errors.New("not found volume")
 	}
 	return listVolumesResp.Volumes[0], nil
+}
+
+func (cli *Client) GetVolumeByName(getVolumesReq *GetVolumesReq) ([]*Volume, error) {
+	listVolumesResp := &GetVolumesResp{}
+
+	query := getVolumesReq.ToQuery()
+	resp, err := cli.DoRequest(serviceName, query)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(resp, listVolumesResp); err != nil {
+		return nil, err
+	}
+	if len(listVolumesResp.Volumes) == 0 {
+		return nil, errors.New("not found volume")
+	}
+	return listVolumesResp.Volumes, nil
 }
 
 //TODO
@@ -222,13 +241,13 @@ func ValidateCreateVolumeReq(req *CreateVolumeReq) error {
 	if !validateReqParams(ChargeTypeRegexp, req.ChargeType) {
 		return status.Errorf(codes.InvalidArgument, "ChargeType (%v) is invalid", req.ChargeType)
 	}
-/*
-	if req.PurchaseTime != 0 {
-		if !validateReqParams(PurchaseTimeRegexp, strconv.Itoa(req.PurchaseTime)) {
-			return status.Errorf(codes.InvalidArgument, "purchase time (%v) is invalid", req.PurchaseTime)
+	/*
+		if req.PurchaseTime != 0 {
+			if !validateReqParams(PurchaseTimeRegexp, strconv.Itoa(req.PurchaseTime)) {
+				return status.Errorf(codes.InvalidArgument, "purchase time (%v) is invalid", req.PurchaseTime)
+			}
 		}
-	}
-*/
+	*/
 	return nil
 }
 

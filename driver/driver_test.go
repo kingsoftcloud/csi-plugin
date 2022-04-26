@@ -38,10 +38,10 @@ type fakeNodeServer struct {
 func getNodeServer(config *Config) *fakeNodeServer {
 	nodeServer := &fakeNodeServer{
 		NodeServer: &NodeServer{
-			driverName: config.DriverName,
-			nodeName:   nodeID,
-			nodeID:     nodeID,
-			mounter:    NewFakeMounter(),
+			//driverName: config.DriverName,
+			nodeName: nodeID,
+			nodeID:   nodeID,
+			mounter:  NewFakeMounter(),
 		},
 	}
 	return nodeServer
@@ -177,6 +177,10 @@ func (f *FakeStorageClient) GetVolume(listVolumesReq *ebsClient.ListVolumesReq) 
 	}
 
 	return vol, nil
+}
+func (f *FakeStorageClient) GetVolumeByName(listVolumesReq *ebsClient.GetVolumesReq) ([]*ebsClient.Volume, error) {
+
+	return nil, nil
 }
 
 func (f *FakeStorageClient) CreateVolume(createVolumeReq *ebsClient.CreateVolumeReq) (*ebsClient.CreateVolumeResp, error) {
