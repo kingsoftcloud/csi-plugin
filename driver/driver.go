@@ -72,18 +72,21 @@ func (d *Driver) Run() error {
 	proto, addr, err := ParseEndpoint(d.endpoint)
 	if err != nil {
 		glog.Fatal(err.Error())
+		return err
 	}
 
 	if proto == "unix" {
 		addr = "/" + addr
 		if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
 			glog.Fatalf("Failed to remove %s, error: %s", addr, err.Error())
+			return err
 		}
 	}
 
 	listener, err := net.Listen(proto, addr)
 	if err != nil {
 		glog.Fatalf("Failed to listen: %v", err)
+		return err
 	}
 
 	opts := []grpc.ServerOption{

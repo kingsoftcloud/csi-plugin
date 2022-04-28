@@ -326,6 +326,17 @@ func (d *NodeServer) getNodeServiceCapabilities() []*csi.NodeServiceCapability {
 }
 
 func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	// fix bug, ca触发时，新增的节点 csi node ds pod 会依赖node label
+	if len(d.region) == 0 || len(d.zone) == 0 {
+		k8sCli := d.config.K8sClient
+		node, err := k8sCli.CoreV1().Nodes().Get(context.Background(), d.nodeName, meta_v1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		d.region = node.Labels[util.NodeRegionKey]
+		d.zone = node.Labels[util.NodeZoneKey]
+	}
+
 	resp := &csi.NodeGetInfoResponse{
 		NodeId:            d.nodeID,
 		MaxVolumesPerNode: 3,

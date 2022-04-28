@@ -7,6 +7,8 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"syscall"
+	"time"
 
 	api "csi-plugin/pkg/open-api"
 
@@ -39,7 +41,8 @@ var (
 
 	openApiEndpoint = flag.String("open-api-endpoint", "internal.api.ksyun.com", "")
 	openApiSchema   = flag.String("open-api-schema", "http", "")
-        region          = flag.String("region", "cn-beijing-6", "")
+	region          = flag.String("region", "cn-beijing-6", "")
+	timeout         = flag.Duration("timeout", 7*time.Second, "Timeout specifies a time limit for requests made by this Client.")
 	//clusterInfoPath = flag.String("cluster-info-path", "/opt/app-agent/arrangement/clusterinfo", "")
 )
 
@@ -87,13 +90,13 @@ func loadClusterInfo(clusterInfoPath string) (*ClusterInfo, error) {
 }
 
 func getDriver() *driver.Driver {
-/*
-	ci, err := loadClusterInfo(*clusterInfoPath)
-	if err != nil {
-		panic(err)
-	}
-	glog.Infof("cluster info: %v", ci)
-*/
+	/*
+		ci, err := loadClusterInfo(*clusterInfoPath)
+		if err != nil {
+			panic(err)
+		}
+		glog.Infof("cluster info: %v", ci)
+	*/
 
 	OpenApiConfig := &api.ClientConfig{
 		AccessKeyId:     *accessKeyId,
@@ -101,6 +104,7 @@ func getDriver() *driver.Driver {
 		OpenApiEndpoint: *openApiEndpoint,
 		OpenApiPrefix:   *openApiSchema,
 		Region:          *region,
+		Timeout:         *timeout,
 	}
 
 	cfg := &driver.Config{
@@ -121,19 +125,26 @@ func getDriver() *driver.Driver {
 
 func main() {
 	flag.Parse()
-	glog.Infof("CSI plugin, version: %s", version)
+	glog.Infof("CSI plugin, version: %s, endpoint: %v, http client timeout: %v", version, *endpoint, *timeout)
 
 	util.InitAksk(new_k8sclient())
-
+	stop := make(chan struct{})
 	d := getDriver()
 	go func() {
-		c := make(chan os.Signal)
-		signal.Notify(c, os.Interrupt, os.Kill)
-		<-c
-		d.Stop()
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+		s := <-c
+		glog.Infof("got system signal: %v, exiting", s)
+		stop <- struct{}{}
+	}()
+	go func() {
+		if err := d.Run(); err != nil {
+			glog.Fatal(err)
+			stop <- struct{}{}
+		}
 	}()
 
-	if err := d.Run(); err != nil {
-		glog.Fatal(err)
-	}
+	<-stop
+	d.Stop()
+
 }

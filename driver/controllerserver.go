@@ -92,6 +92,37 @@ func (cs *KscEBSControllerServer) validateControllerServiceRequest(c csi.Control
 	return status.Errorf(codes.InvalidArgument, "unsupported capability %s", c)
 }
 
+/*
+"accessibility_requirements":
+ {
+	"preferred":
+ [
+	 {
+		 "segments":
+	   {
+		   "failure-domain.beta.kubernetes.io/region":"cn-shanghai-3",
+		   "failure-domain.beta.kubernetes.io/zone":"cn-shanghai-3b"
+		}
+	}
+  ],
+  "requisite":
+    [
+		{
+			"segments":{
+				"failure-domain.beta.kubernetes.io/region":"cn-shanghai-3",
+				"failure-domain.beta.kubernetes.io/zone":"cn-shanghai-3b"
+			}
+		}
+	]
+},
+"capacity_range":
+    {"required_bytes":10737418240},
+ "name":"pvc-7e74a413-a305-4c7d-a2aa-cd1025065f88",
+ "parameters":{"chargetype":"Daily","purchasetime":"10","type":"SSD3.0"},
+ "volume_capabilities":[{"AccessType":{"Mount":{}},"access_mode":{"mode":1}}]
+}
+
+*/
 func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	if err := cs.validateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
 		glog.V(3).Infof("invalid create volume req: %v", req)
@@ -119,8 +150,6 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	listVolumesResp, err := cs.ebsClient.GetVolumeByName(&ebsClient.GetVolumesReq{
 		VolumeName:     volumeName,
 		VolumeCategory: "data",
-		//TODO
-		VolumeStatus: "unbind",
 	})
 	if err != nil {
 		return nil, err
@@ -142,7 +171,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
 				VolumeId:      vol.VolumeId,
-				CapacityBytes: vol.Size * GB,
+				CapacityBytes: size,
 			},
 		}, nil
 	}
@@ -243,8 +272,8 @@ func (cs *KscEBSControllerServer) ControllerUnpublishVolume(ctx context.Context,
 	}
 
 	detachVolumeReq := &ebsClient.DetachVolumeReq{
-		req.VolumeId,
-		req.NodeId,
+		VolumeId:   req.VolumeId,
+		InstanceId: req.NodeId,
 	}
 	if _, err := cs.ebsClient.Detach(detachVolumeReq); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

@@ -40,6 +40,7 @@ type ClientConfig struct {
 	Region          string
 	OpenApiEndpoint string
 	OpenApiPrefix   string
+	Timeout         time.Duration
 }
 
 func New(config *ClientConfig) *Client {
@@ -47,7 +48,9 @@ func New(config *ClientConfig) *Client {
 		accessKeyId:     config.AccessKeyId,
 		accessKeySecret: config.AccessKeySecret,
 		region:          config.Region,
-		httpClient:      &http.Client{},
+		httpClient: &http.Client{
+			Timeout: config.Timeout,
+		},
 
 		openApiEndpoint: config.OpenApiEndpoint,
 		openApiPrefix:   config.OpenApiPrefix,
@@ -73,7 +76,12 @@ func (cli *Client) buildRequestWithBodyReader(serviceName string, body io.Reader
 	req, _ := http.NewRequest("GET", endpoint, body)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("")
+	// test
+	//req.Header.Set("X-KSC-ACCOUNT-ID", "73404680")
+	//t := time.Now().Unix()
+	//req.Header.Set("X-KSC-REQUEST-ID", "xiangqian-test-"+strconv.Itoa(int(t)))
+	//req.Header.Set("X-KSC-REGION", "cn-shanghai-3")
+	//req.Header.Set("X-KSC-SOURCE", "user")
 
 	if bodyLen > 0 {
 		req.Header.Set("Content-Length", strconv.Itoa(bodyLen))
@@ -124,8 +132,12 @@ func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
 		glog.Error("Get Response failed: ", err)
 		return nil, err
 	}
-
-	glog.Info("OpenAPI return: ", string(res_body))
+	//TODO:
+	if len(res_body) > 1024 {
+		glog.Info("OpenAPI return: ", string(res_body[:1024]))
+	} else {
+		glog.Info("OpenAPI return: ", string(res_body))
+	}
 
 	type Error struct {
 		Code    string

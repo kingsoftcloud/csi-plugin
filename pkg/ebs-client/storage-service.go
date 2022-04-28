@@ -31,7 +31,7 @@ const (
 
 	// volume size
 	// 单位 GB
-	MIN_VOLUME_SIZE int64 = 10
+	MIN_VOLUME_SIZE int64 = 1
 	MAX_VOLUME_SIZE int64 = 16000
 
 	// charge type
