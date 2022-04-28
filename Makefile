@@ -1,4 +1,5 @@
-VERSION ?= latest
+#VERSION ?= latest
+VERSION ?= 1.5.1-amd64-t
 ARCH ?= amd64
 
 all: clean compile build

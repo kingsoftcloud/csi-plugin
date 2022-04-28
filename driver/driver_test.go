@@ -38,10 +38,10 @@ type fakeNodeServer struct {
 func getNodeServer(config *Config) *fakeNodeServer {
 	nodeServer := &fakeNodeServer{
 		NodeServer: &NodeServer{
-			driverName: config.DriverName,
-			nodeName:   nodeID,
-			nodeID:     nodeID,
-			mounter:    NewFakeMounter(),
+			//driverName: config.DriverName,
+			nodeName: nodeID,
+			nodeID:   nodeID,
+			mounter:  NewFakeMounter(),
 		},
 	}
 	return nodeServer

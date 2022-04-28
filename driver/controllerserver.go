@@ -92,6 +92,37 @@ func (cs *KscEBSControllerServer) validateControllerServiceRequest(c csi.Control
 	return status.Errorf(codes.InvalidArgument, "unsupported capability %s", c)
 }
 
+/*
+"accessibility_requirements":
+ {
+	"preferred":
+ [
+	 {
+		 "segments":
+	   {
+		   "failure-domain.beta.kubernetes.io/region":"cn-shanghai-3",
+		   "failure-domain.beta.kubernetes.io/zone":"cn-shanghai-3b"
+		}
+	}
+  ],
+  "requisite":
+    [
+		{
+			"segments":{
+				"failure-domain.beta.kubernetes.io/region":"cn-shanghai-3",
+				"failure-domain.beta.kubernetes.io/zone":"cn-shanghai-3b"
+			}
+		}
+	]
+},
+"capacity_range":
+    {"required_bytes":10737418240},
+ "name":"pvc-7e74a413-a305-4c7d-a2aa-cd1025065f88",
+ "parameters":{"chargetype":"Daily","purchasetime":"10","type":"SSD3.0"},
+ "volume_capabilities":[{"AccessType":{"Mount":{}},"access_mode":{"mode":1}}]
+}
+
+*/
 func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	if err := cs.validateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
 		glog.V(3).Infof("invalid create volume req: %v", req)
@@ -116,7 +147,9 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 
 	volumeName := req.Name
 	// get volume first, if it's created do no thing
-	listVolumesResp, err := cs.ebsClient.ListVolumes(&ebsClient.ListVolumesReq{})
+	listVolumesResp, err := cs.ebsClient.ListVolumes(&ebsClient.ListVolumesReq{
+		VolumeCategory: "data",
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +173,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
 				VolumeId:      vol.VolumeId,
-				CapacityBytes: vol.Size * GB,
+				CapacityBytes: size,
 			},
 		}, nil
 	}
@@ -174,7 +207,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	purchaseTime, err := strconv.Atoi(parameters.Get("purchasetime", defaultPurchaseTime))
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
-	} 
+	}
 	if purchaseTime != 0 {
 		createVolumeReq.PurchaseTime = purchaseTime
 	}
@@ -241,8 +274,8 @@ func (cs *KscEBSControllerServer) ControllerUnpublishVolume(ctx context.Context,
 	}
 
 	detachVolumeReq := &ebsClient.DetachVolumeReq{
-		req.VolumeId,
-		req.NodeId,
+		VolumeId:   req.VolumeId,
+		InstanceId: req.NodeId,
 	}
 	if _, err := cs.ebsClient.Detach(detachVolumeReq); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
