@@ -116,7 +116,7 @@ func (m *mounter) Mount(source, target, fsType string, opts ...string) error {
 	mountArgs = append(mountArgs, target)
 
 	// create target, os.Mkdirall is noop if it exists
-	err := os.MkdirAll(target, 0750)
+	err := os.MkdirAll(target, 0777)
 	if err != nil {
 		return err
 	}

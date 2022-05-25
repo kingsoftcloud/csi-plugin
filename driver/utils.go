@@ -61,16 +61,13 @@ func validateCapabilities(caps []*csi.VolumeCapability) bool {
 }
 
 func volumeAlreadyCreated(c ebsClient.StorageService, volumeName string) (bool, error) {
-	resp, err := c.ListVolumes(&ebsClient.ListVolumesReq{})
+	resp, err := c.GetVolumeByName(&ebsClient.ListVolumesReq{
+		VolumeExactName: volumeName,
+	})
 	if err != nil {
 		return false, err
 	}
-	for _, volume := range resp.Volumes {
-		if volumeName == volume.VolumeName {
-			return true, nil
-		}
-	}
-	return false, nil
+	return resp.TotalCount > 0, nil
 }
 
 // extractStorage extracts the storage size in bytes from the given capacity

@@ -22,13 +22,13 @@ func init() {
 }
 
 var (
-	socket           = "/tmp/csi.sock"
-	endpoint         = "unix://" + socket
-	driverName       = "com.ksc.csi.diskplugin"
-	nodeID           = "test-node"
-	version          = "0.1"
-	region           = "test-region"
-	availabilityZone = "test-availabilityzone"
+	socket     = "/tmp/csi.sock"
+	endpoint   = "unix://" + socket
+	driverName = "com.ksc.csi.diskplugin"
+	nodeID     = "test-node"
+	version    = "0.1"
+	// region           = "test-region"
+	// availabilityZone = "test-availabilityzone"
 )
 
 type fakeNodeServer struct {
@@ -178,7 +178,7 @@ func (f *FakeStorageClient) GetVolume(listVolumesReq *ebsClient.ListVolumesReq) 
 
 	return vol, nil
 }
-func (f *FakeStorageClient) GetVolumeByName(listVolumesReq *ebsClient.GetVolumesReq) ([]*ebsClient.Volume, error) {
+func (f *FakeStorageClient) GetVolumeByName(listVolumesReq *ebsClient.ListVolumesReq) (*ebsClient.ListVolumesResp, error) {
 
 	return nil, nil
 }

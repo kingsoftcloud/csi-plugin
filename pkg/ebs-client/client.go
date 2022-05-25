@@ -105,8 +105,8 @@ func (cli *Client) GetVolume(listVolumesReq *ListVolumesReq) (*Volume, error) {
 	return listVolumesResp.Volumes[0], nil
 }
 
-func (cli *Client) GetVolumeByName(getVolumesReq *GetVolumesReq) ([]*Volume, error) {
-	listVolumesResp := &GetVolumesResp{}
+func (cli *Client) GetVolumeByName(getVolumesReq *ListVolumesReq) (*ListVolumesResp, error) {
+	listVolumesResp := &ListVolumesResp{}
 
 	query := getVolumesReq.ToQuery()
 	resp, err := cli.DoRequest(serviceName, query)
@@ -117,10 +117,7 @@ func (cli *Client) GetVolumeByName(getVolumesReq *GetVolumesReq) ([]*Volume, err
 	if err := json.Unmarshal(resp, listVolumesResp); err != nil {
 		return nil, err
 	}
-	if len(listVolumesResp.Volumes) == 0 {
-		return nil, errors.New("not found volume")
-	}
-	return listVolumesResp.Volumes, nil
+	return listVolumesResp, nil
 }
 
 //TODO

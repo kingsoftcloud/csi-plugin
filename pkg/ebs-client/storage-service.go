@@ -16,7 +16,7 @@ type StorageService interface {
 	Detach(*DetachVolumeReq) (*DetachVolumeResp, error)
 
 	ValidateAttachInstance(*ValidateAttachInstanceReq) (*ValidateAttachInstanceResp, error)
-	GetVolumeByName(*GetVolumesReq) ([]*Volume, error)
+	GetVolumeByName(getVolumesReq *ListVolumesReq) (*ListVolumesResp, error)
 }
 
 type VolumeStatusType string
@@ -186,42 +186,7 @@ type ListVolumesReq struct {
 	VolumeStatus     string
 	VolumeType       string
 	VolumeCreateDate string
-}
-
-type GetVolumesReq struct {
-	VolumeType     string
-	VolumeCategory string
-	VolumeStatus   string
-	VolumeName     string
-}
-
-func (lv *GetVolumesReq) ToQuery() string {
-	querySlice := []string{"Action=DescribeVolumes"}
-
-	for _, volumeCategory := range []string{DATA_VOlUME_CATE, SYSTEM_VOlUME_CATE} {
-		if lv.VolumeCategory != volumeCategory {
-			continue
-		}
-		querySlice = append(querySlice, fmt.Sprintf("VolumeCategory=%v", lv.VolumeCategory))
-		break
-	}
-	if lv.VolumeStatus != "" {
-		querySlice = append(querySlice, fmt.Sprintf("VolumeStatus=%v", lv.VolumeStatus))
-	}
-
-	for _, vt := range []string{
-		SSD2_0, SSD3_0, SATA2_0,
-	} {
-		if lv.VolumeType != vt {
-			continue
-		}
-		querySlice = append(querySlice, fmt.Sprintf("VolumeType=%v", lv.VolumeType))
-		break
-	}
-	if lv.VolumeName != "" {
-		querySlice = append(querySlice, fmt.Sprintf("VolumeName=%v", lv.VolumeName))
-	}
-	return strings.Join(querySlice, Separator)
+	VolumeExactName  string
 }
 
 func (lv *ListVolumesReq) ToQuery() string {
@@ -238,7 +203,7 @@ func (lv *ListVolumesReq) ToQuery() string {
 		querySlice = append(querySlice, fmt.Sprintf("VolumeCategory=%v", lv.VolumeCategory))
 		break
 	}
-	if lv.VolumeStatus != "" {
+	if len(lv.VolumeStatus) > 0 {
 		querySlice = append(querySlice, fmt.Sprintf("VolumeStatus=%v", lv.VolumeStatus))
 	}
 
@@ -251,20 +216,23 @@ func (lv *ListVolumesReq) ToQuery() string {
 		querySlice = append(querySlice, fmt.Sprintf("VolumeType=%v", lv.VolumeType))
 		break
 	}
-	if lv.VolumeCreateDate != "" {
+	if len(lv.VolumeCreateDate) > 0 {
 		querySlice = append(querySlice, fmt.Sprintf("VolumeCreateDate=%v", lv.VolumeCreateDate))
 	}
+
+	if len(lv.VolumeExactName) > 0 {
+		querySlice = append(querySlice, fmt.Sprintf("VolumeExactName=%v", lv.VolumeExactName))
+	}
+
 	return strings.Join(querySlice, Separator)
 }
 
 type ListVolumesResp struct {
-	RequestId string    `json:"RequestId"`
-	Volumes   []*Volume `json:"Volumes"`
+	RequestId  string    `json:"RequestId"`
+	Volumes    []*Volume `json:"Volumes"`
+	TotalCount int       `json:"TotalCount"`
 }
-type GetVolumesResp struct {
-	RequestId string    `json:"RequestId"`
-	Volumes   []*Volume `json:"Volumes"`
-}
+
 type AttachVolumeReq struct {
 	VolumeId           string
 	InstanceId         string
