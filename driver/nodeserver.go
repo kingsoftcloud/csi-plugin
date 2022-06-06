@@ -338,7 +338,7 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 	}
 
 	resp := &csi.NodeGetInfoResponse{
-		NodeId:            d.nodeID,
+		NodeId: d.nodeID,
 		//refer to  https://docs.ksyun.com/documents/5423 "单实例云硬盘数量"
 		MaxVolumesPerNode: 8,
 		// make sure that the driver works on this particular region only

@@ -83,6 +83,14 @@ func (m *mounter) Format(source, fsType string) error {
 	glog.Infof("executing format command, cmd: %v, args: %v", mkfsCmd, mkfsArgs)
 	out, err := exec.Command(mkfsCmd, mkfsArgs...).CombinedOutput()
 	if err != nil {
+		//  TODO error:  
+		/**
+		formatting disk failed: 
+		exit status 1 
+		cmd: 'mkfs.ext4 -F /dev/disk/by-id/virtio-04eb4eb8-9894-417f-8' 
+		output: "mke2fs 1.45.2 (27-May-2019)\nThe file /dev/disk/by-id/virtio-04eb4eb8-9894-417f-8 does not exist and no size was specified.
+		*/
+		// test exec partprobe 
 		return fmt.Errorf("formatting disk failed: %v cmd: '%s %s' output: %q",
 			err, mkfsCmd, strings.Join(mkfsArgs, " "), string(out))
 	}

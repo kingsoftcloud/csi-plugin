@@ -193,9 +193,9 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		}
 		glog.Info(fmt.Sprintf("rand region and zone: %s, %s", region, zone))
 	}
-	
-	tags,err:=parseTags(parameters.Get("tags", ""))
-	if err!= nil {
+
+	tags, err := parseTags(parameters.Get("tags", ""))
+	if err != nil {
 		return nil, err
 	}
 	createVolumeReq := &ebsClient.CreateVolumeReq{
@@ -290,13 +290,17 @@ func (cs *KscEBSControllerServer) ControllerUnpublishVolume(ctx context.Context,
 	listVolumesReq := &ebsClient.ListVolumesReq{
 		VolumeIds: []string{req.VolumeId},
 	}
-	_, err := cs.ebsClient.GetVolume(listVolumesReq)
+	ebs, err := cs.ebsClient.GetVolume(listVolumesReq)
 	if err != nil {
 		if err.Error() == "not found volume" {
-			glog.Errorf("get volume %s error: %v", req.VolumeId, err)
+			glog.Errorf("volume id: %s error: %v. volume is deleted", req.VolumeId, err)
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
 		}
 		return nil, status.Errorf(codes.Internal, err.Error())
+	}
+	if ebs.VolumeStatus != "in-use" {
+		glog.Infof("volume id: %s, volume status %s. volume is detached ", req.VolumeId, ebs.VolumeStatus)
+		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
 	detachVolumeReq := &ebsClient.DetachVolumeReq{
