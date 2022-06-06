@@ -2,8 +2,10 @@ package driver
 
 import (
 	ebsClient "csi-plugin/pkg/ebs-client"
+	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -191,7 +193,11 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		}
 		glog.Info(fmt.Sprintf("rand region and zone: %s, %s", region, zone))
 	}
-
+	
+	tags,err:=parseTags(parameters.Get("tags", ""))
+	if err!= nil {
+		return nil, err
+	}
 	createVolumeReq := &ebsClient.CreateVolumeReq{
 		AvailabilityZone: zone,
 		VolumeName:       volumeName,
@@ -200,6 +206,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		ChargeType:       chargeType,
 		VolumeType:       volumeType,
 		ProjectId:        projectId,
+		Tags:             tags,
 	}
 
 	purchaseTime, err := strconv.Atoi(parameters.Get("purchasetime", defaultPurchaseTime))
@@ -231,6 +238,23 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	}
 
 	return resp, nil
+}
+func parseTags(p string) (map[string]string, error) {
+	res := make(map[string]string)
+	parts := strings.Split(p, ";")
+	fmt.Println(parts)
+	if len(parts) > 5 {
+		return nil, errors.New("the number of labels cannot exceed 5")
+	}
+	for _, label := range parts {
+		temp := strings.Split(label, "~")
+		if len(temp) != 2 {
+			glog.Warningf("Invalid label: %v; %s", temp, label)
+			continue
+		}
+		res[temp[0]] = temp[1]
+	}
+	return res, nil
 }
 
 func (cs *KscEBSControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
@@ -268,7 +292,11 @@ func (cs *KscEBSControllerServer) ControllerUnpublishVolume(ctx context.Context,
 	}
 	_, err := cs.ebsClient.GetVolume(listVolumesReq)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, err.Error())
+		if err.Error() == "not found volume" {
+			glog.Errorf("get volume %s error: %v", req.VolumeId, err)
+			return &csi.ControllerUnpublishVolumeResponse{}, nil
+		}
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	detachVolumeReq := &ebsClient.DetachVolumeReq{

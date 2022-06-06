@@ -3,6 +3,8 @@ package ebsClient
 import (
 	"fmt"
 	"strings"
+
+	"github.com/golang/glog"
 )
 
 type StorageService interface {
@@ -84,6 +86,7 @@ type CreateVolumeReq struct {
 	ChargeType       string
 	PurchaseTime     int
 	ProjectId        string
+	Tags             map[string]string
 }
 
 func (cv *CreateVolumeReq) ToQuery() string {
@@ -136,7 +139,19 @@ func (cv *CreateVolumeReq) ToQuery() string {
 		cv.Size = MAX_VOLUME_SIZE
 	}
 	querySlice = append(querySlice, fmt.Sprintf("Size=%v", cv.Size))
-
+	//Tag.1.Key=123&Tag.1.Value=456&Tag.2.Key=Usage&Tag.2.Value=test123'
+	if len(cv.Tags) > 0 {
+		i := 1
+		for k, v := range cv.Tags {
+			if len(v) == 0 {
+				glog.Infof("Invalid tag: key=%s, value=%s", k, v)
+				continue
+			}
+			querySlice = append(querySlice, fmt.Sprintf("Tag.%d.Key=%s", i, k))
+			querySlice = append(querySlice, fmt.Sprintf("Tag.%d.Value=%s", i, v))
+			i++
+		}
+	}
 	return strings.Join(querySlice, Separator)
 }
 
@@ -299,4 +314,7 @@ func (va *ValidateAttachInstanceReq) ToQuery() string {
 type ValidateAttachInstanceResp struct {
 	RequestId      string `json:"RequestId"`
 	InstanceEnable bool   `json:"InstanceEnable"`
+	// InstanceState  string `json:"InstanceState"`
+	// LargeVolumeSupport bool `json:"LargeVolumeSupport"`
+	// AvailableVolumeNum int `json:"AvailableVolumeNum"`
 }
