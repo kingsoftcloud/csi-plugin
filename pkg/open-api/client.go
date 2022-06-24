@@ -104,6 +104,10 @@ func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
 		ak = aksk.AK
 		sk = aksk.SK
 	}
+
+	if len(cli.region) == 0{
+		cli.region=aksk.Region
+	}
 	s := v4.Signer{Credentials: credentials.NewStaticCredentials(ak, sk, "")}
 	query = fmt.Sprintf("%v&Version=%v", query, Version)
 

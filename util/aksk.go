@@ -20,6 +20,7 @@ type AKSK struct {
 	SK            string
 	SecurityToken string
 	K8sclient     *k8sclient.Clientset
+	Region        string
 }
 
 var aksk = AKSK{}
@@ -36,6 +37,7 @@ func GetAKSK() (AKSK, error) {
 	}
 	aksk.AK = cm.Data["ak"]
 	aksk.SK = cm.Data["sk"]
+	aksk.Region = cm.Data["region"]
 	securityToken, ok := cm.Data["securityToken"]
 	if !ok {
 		return aksk, fmt.Errorf("securityToken not found in configmap %s", ConfigMapName)

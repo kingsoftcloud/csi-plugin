@@ -41,8 +41,8 @@ var (
 
 	openApiEndpoint = flag.String("open-api-endpoint", "internal.api.ksyun.com", "")
 	openApiSchema   = flag.String("open-api-schema", "http", "")
-	region          = flag.String("region", "cn-beijing-6", "")
-	timeout         = flag.Duration("timeout", 10*time.Second, "Timeout specifies a time limit for requests made by this Client.")
+	region          = flag.String("region", "", "")
+	timeout         = flag.Duration("timeout", 30*time.Second, "Timeout specifies a time limit for requests made by this Client.")
 	//clusterInfoPath = flag.String("cluster-info-path", "/opt/app-agent/arrangement/clusterinfo", "")
 )
 
@@ -119,7 +119,7 @@ func getDriver() *driver.Driver {
 
 		Version: version,
 	}
-
+	glog.Infof("config: %v", cfg)
 	return driver.NewDriver(cfg)
 }
 

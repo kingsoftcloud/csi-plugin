@@ -268,8 +268,9 @@ func (av *AttachVolumeReq) ToQuery() string {
 }
 
 type AttachVolumeResp struct {
-	RequestId string `json:"RequestId"`
-	Return    bool   `json:"Return"`
+	RequestId  string `json:"RequestId"`
+	Return     bool   `json:"Return"`
+	MountPoint string `json:"MountPoint"`
 }
 
 type DetachVolumeReq struct {

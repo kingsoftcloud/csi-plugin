@@ -1,7 +1,6 @@
 package driver
 
 import (
-	ebsClient "csi-plugin/pkg/ebs-client"
 	"errors"
 	"os"
 	"path/filepath"
@@ -26,7 +25,7 @@ const (
 type NodeServer struct {
 	config Config
 
-	mutex    sync.Mutex
+	sync.Mutex
 	nodeName string
 	nodeID   string
 	region   string
@@ -66,7 +65,7 @@ func GetNodeServer(cfg *Config) *NodeServer {
 
 func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	annNoFormatVolume := d.config.DriverName + "/noformat"
-	publishInfoVolumeName := d.config.DriverName + "/volume-name"
+	//publishInfoVolumeName := d.config.DriverName + "/volume-name"
 
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume ID must be provided")
@@ -80,11 +79,17 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume Capability must be provided")
 	}
 
-	if _, ok := req.GetPublishContext()[publishInfoVolumeName]; !ok {
-		return nil, status.Error(codes.InvalidArgument, "Could not find the volume by name")
+	// if _, ok := req.GetPublishContext()[publishInfoVolumeName]; !ok {
+	// 	return nil, status.Error(codes.InvalidArgument, "Could not find the volume by name")
+	// }
+	devMountPoint, ok := req.GetPublishContext()["MountPoint"]
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "controller attach, Could not find the dev in node")
 	}
-
+	glog.Infof("dev attach point:  %s", devMountPoint)
+	// TODO  这里使用 /dev/disk/by-id/virtio-* 挂载，因为 openapi 返回的挂载点有时候与node实际挂载点（/dev/vd*）不符
 	source := getDiskSource(req.VolumeId)
+	//source := mountPoint
 	target := req.StagingTargetPath
 
 	mnt := req.VolumeCapability.GetMount()
@@ -95,8 +100,10 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		fsType = mnt.FsType
 	}
 
-	_, ok := req.GetVolumeContext()[annNoFormatVolume]
+	_, ok = req.GetVolumeContext()[annNoFormatVolume]
 	if !ok {
+		d.Lock()
+		defer d.Unlock()
 		formatted, err := d.mounter.IsFormatted(source)
 		if err != nil {
 			return nil, err
@@ -244,6 +251,7 @@ func (d *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVol
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
+// TODO 目前不支持 xfs 文件系统扩容
 func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	if !d.config.EnableVolumeExpansion {
 		return nil, status.Error(codes.Unimplemented, "NodeExpandVolume is not supported")
@@ -258,38 +266,29 @@ func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 		return nil, status.Error(codes.InvalidArgument, "Capacity range not provided")
 	}
 
-	capacity := int64(capRange.GetRequiredBytes()) / 1024 / 1024 / 1024
-	if capacity > d.config.MaxVolumeSize {
-		return nil, status.Errorf(codes.OutOfRange, "Requested capacity %d exceeds maximum allowed %d", capacity, d.config.MaxVolumeSize)
-	}
+	devName := getDiskSource(volID)
 
-	// Lock before acting on global state. A production-quality
-	// driver might use more fine-grained locking.
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	listVolumesReq := &ebsClient.ListVolumesReq{
-		VolumeIds: []string{volID},
-	}
-
-	exVol, err := d.config.EbsClient.GetVolume(listVolumesReq)
-	if err != nil {
-		return nil, err
-	}
-
-	if exVol.Size < capacity {
-		var expandVolResp *ebsClient.ExpandVolumeResp
-		var expandVolReq = &ebsClient.ExpandVolumeReq{Size: capacity, OnlineResize: true, VolumeId: volID}
-		if expandVolResp, err = d.config.EbsClient.ExpandVolume(expandVolReq); err != nil {
-			glog.Infof("Expand volume-%s failed response: %s , error: %s", volID, expandVolResp, err)
-			return nil, err
-		} else {
-			glog.Info("volume-%s expanded success.", volID)
+	mnt := req.VolumeCapability.GetMount()
+	switch mnt.FsType {
+	case "xfs":
+		d.mounter.Expand(mnt.FsType, req.VolumePath)
+	case "ext4", "ext3", "ext2":
+		d.mounter.Expand(mnt.FsType, devName)
+	case "":
+		ok, err := d.mounter.Expand("ext4", devName)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "expand failed with error: %v, fs type: %s, source: %s", err, "ext4", devName)
 		}
+		if !ok {
+			return nil, status.Errorf(codes.Internal, "expand failed, fs type: %s, source: %s", "ext4", devName)
+		}
+	default:
+		glog.Errorf("not supported fsType: %s", mnt.FsType)
+		return nil, status.Errorf(codes.InvalidArgument, "not supported fsType: %s", mnt.FsType)
 	}
 
 	return &csi.NodeExpandVolumeResponse{
-		CapacityBytes: capRange.GetRequiredBytes(),
+		//CapacityBytes: capRange.GetRequiredBytes(),
 	}, nil
 }
 

@@ -94,37 +94,6 @@ func (cs *KscEBSControllerServer) validateControllerServiceRequest(c csi.Control
 	return status.Errorf(codes.InvalidArgument, "unsupported capability %s", c)
 }
 
-/*
-"accessibility_requirements":
- {
-	"preferred":
- [
-	 {
-		 "segments":
-	   {
-		   "failure-domain.beta.kubernetes.io/region":"cn-shanghai-3",
-		   "failure-domain.beta.kubernetes.io/zone":"cn-shanghai-3b"
-		}
-	}
-  ],
-  "requisite":
-    [
-		{
-			"segments":{
-				"failure-domain.beta.kubernetes.io/region":"cn-shanghai-3",
-				"failure-domain.beta.kubernetes.io/zone":"cn-shanghai-3b"
-			}
-		}
-	]
-},
-"capacity_range":
-    {"required_bytes":10737418240},
- "name":"pvc-7e74a413-a305-4c7d-a2aa-cd1025065f88",
- "parameters":{"chargetype":"Daily","purchasetime":"10","type":"SSD3.0"},
- "volume_capabilities":[{"AccessType":{"Mount":{}},"access_mode":{"mode":1}}]
-}
-
-*/
 func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	if err := cs.validateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
 		glog.V(3).Infof("invalid create volume req: %v", req)
@@ -152,6 +121,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	listVolumesResp, err := cs.ebsClient.GetVolumeByName(&ebsClient.ListVolumesReq{
 		VolumeExactName: volumeName,
 		VolumeCategory:  "data",
+		VolumeStatus:    "available",
 	})
 	if err != nil {
 		return nil, err
@@ -161,9 +131,28 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	if listVolumesResp.TotalCount > 0 && len(listVolumesResp.Volumes) > 0 {
 
 		if listVolumesResp.TotalCount > 1 {
-			// external-provisioner 调用了三次 rpc createvolume，第一次耗费在 listebs，然后创建一个ebs，第二次调用时
-			// 第一次的ebs 还没有创建出来，然后创建ebs，第三次调用后，第一次的。。
-			return nil, fmt.Errorf("fatal issue: duplicate volume %q exists", volumeName)
+			// external-provisioner 调用了三次 rpc createvolume
+			// 目前解决办法是，需要用户手动去控制台删除一块ebs盘
+			// TODO 是否需要csi 删除一块
+			if listVolumesResp.TotalCount == 2 {
+				if cs.delvolume(listVolumesResp.Volumes[0], size) {
+					return &csi.CreateVolumeResponse{
+						Volume: &csi.Volume{
+							VolumeId:      listVolumesResp.Volumes[1].VolumeId,
+							CapacityBytes: size,
+						},
+					}, nil
+				} else if cs.delvolume(listVolumesResp.Volumes[1], size) {
+					return &csi.CreateVolumeResponse{
+						Volume: &csi.Volume{
+							VolumeId:      listVolumesResp.Volumes[0].VolumeId,
+							CapacityBytes: size,
+						},
+					}, nil
+				} else {
+					return nil, fmt.Errorf("fatal issue: duplicate volume %q exists", volumeName)
+				}
+			}
 		}
 		vol := listVolumesResp.Volumes[0]
 		if vol.Size*GB != size {
@@ -239,6 +228,22 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 
 	return resp, nil
 }
+
+//delvolume For CreateVolume rpc timeout error
+func (cs *KscEBSControllerServer) delvolume(delVol *ebsClient.Volume, size int64) bool {
+	createTime, _ := time.Parse("2006-01-02 15:04:05", delVol.CreateTime)
+	if delVol.VolumeDesc == createdByDO && delVol.Size == size/GB && time.Since(createTime).Seconds() < 60 {
+		_, err := cs.ebsClient.DeleteVolume(&ebsClient.DeleteVolumeReq{
+			VolumeId: delVol.VolumeId,
+		})
+		if err != nil {
+			glog.Errorf("Error deleting volume on duplicate createvolume, volume id: %s", delVol.VolumeId)
+		}
+		return true
+	}
+	return false
+}
+
 func parseTags(p string) (map[string]string, error) {
 	res := make(map[string]string)
 	parts := strings.Split(p, ";")
@@ -390,7 +395,8 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 		VolumeId:   req.VolumeId,
 		InstanceId: req.NodeId,
 	}
-	if _, err := cs.ebsClient.Attach(attachVolumeReq); err != nil {
+	resp, err := cs.ebsClient.Attach(attachVolumeReq)
+	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -401,7 +407,8 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 	glog.Info("volume attached")
 	return &csi.ControllerPublishVolumeResponse{
 		PublishContext: map[string]string{
-			publishInfoVolumeName: vol.VolumeName,
+			//publishInfoVolumeName: vol.VolumeName,
+			"MountPoint": resp.MountPoint,
 		},
 	}, nil
 }

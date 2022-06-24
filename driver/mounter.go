@@ -41,6 +41,8 @@ type Mounter interface {
 	// propagated). It returns true if it's mounted. An error is returned in
 	// case of system errors or if it's mounted incorrectly.
 	IsMounted(target string) (bool, error)
+	//Expand FileSystem only xfs and ext*(2,3,4) support expand
+	Expand(fsType, source string) (bool, error)
 }
 
 // TODO(arslan): this is Linux only for now. Refactor this into a package with
@@ -83,14 +85,14 @@ func (m *mounter) Format(source, fsType string) error {
 	glog.Infof("executing format command, cmd: %v, args: %v", mkfsCmd, mkfsArgs)
 	out, err := exec.Command(mkfsCmd, mkfsArgs...).CombinedOutput()
 	if err != nil {
-		//  TODO error:  
+		//  TODO error:
 		/**
-		formatting disk failed: 
-		exit status 1 
-		cmd: 'mkfs.ext4 -F /dev/disk/by-id/virtio-04eb4eb8-9894-417f-8' 
+		formatting disk failed:
+		exit status 1
+		cmd: 'mkfs.ext4 -F /dev/disk/by-id/virtio-04eb4eb8-9894-417f-8'
 		output: "mke2fs 1.45.2 (27-May-2019)\nThe file /dev/disk/by-id/virtio-04eb4eb8-9894-417f-8 does not exist and no size was specified.
 		*/
-		// test exec partprobe 
+		// test exec partprobe
 		return fmt.Errorf("formatting disk failed: %v cmd: '%s %s' output: %q",
 			err, mkfsCmd, strings.Join(mkfsArgs, " "), string(out))
 	}
@@ -124,16 +126,55 @@ func (m *mounter) Mount(source, target, fsType string, opts ...string) error {
 	mountArgs = append(mountArgs, target)
 
 	// create target, os.Mkdirall is noop if it exists
-	err := os.MkdirAll(target, 0777)
+	// 0755 保持与kublet 创建目录文件权限一致
+	// 0777 暂时兼容非root权限使用csi的fsgroup不生效,导致无法读写的问题
+	err := os.MkdirAll(target, os.FileMode(0755))
 	if err != nil {
 		return err
 	}
 
+	fileinfo, err := os.Stat(source)
+	if err != nil {
+		return err
+	}
+	mode10 := uint32(fileinfo.Mode().Perm())
+	// if mode10 == 493 || mode10 == 488 {
+	// 	out, err := exec.Command("chmod", []string{"777", target}...).CombinedOutput()
+	// 	if err != nil {
+	// 		return fmt.Errorf("chmod failed: %v cmd: '%s %s' output: %q",
+	// 			err, mountCmd, strings.Join(mountArgs, " "), string(out))
+	// 	}
+
+	// 	out, err = exec.Command("chmod", []string{"g+s", target}...).CombinedOutput()
+	// 	if err != nil {
+	// 		return fmt.Errorf("chmod failed: %v cmd: '%s %s' output: %q",
+	// 			err, mountCmd, strings.Join(mountArgs, " "), string(out))
+	// 	}
+
+	// }
+	// fileinfo, _ = os.Stat(target)
+	glog.Infof("source mode: %d", uint32(fileinfo.Mode().Perm()))
 	glog.Infof("executing mount command, cmd: %v, args: %v", mountCmd, mountArgs)
+	//err = syscall.Mount(source, target, fsType, 0, "")
 	out, err := exec.Command(mountCmd, mountArgs...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("mounting failed: %v cmd: '%s %s' output: %q",
 			err, mountCmd, strings.Join(mountArgs, " "), string(out))
+	}
+
+	if mode10 < 511 {
+		out, err := exec.Command("chmod", []string{"777", target}...).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("chmod failed: %v cmd: '%s %s' output: %q",
+				err, mountCmd, strings.Join(mountArgs, " "), string(out))
+		}
+
+		out, err = exec.Command("chmod", []string{"g+s", target}...).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("chmod failed: %v cmd: '%s %s' output: %q",
+				err, mountCmd, strings.Join(mountArgs, " "), string(out))
+		}
+
 	}
 
 	return nil
@@ -175,6 +216,7 @@ func (m *mounter) IsFormatted(source string) (bool, error) {
 
 	glog.Infof("checking if source is formatted, cmd: %v, args: %v", blkidCmd, blkidArgs)
 	out, _ := exec.Command(blkidCmd, blkidArgs...).CombinedOutput()
+	glog.Infof("exec blkid cmd, return %s.", string(out))
 	if strings.TrimSpace(string(out)) == "" {
 		return false, nil
 	}
@@ -235,4 +277,35 @@ func (m *mounter) IsMounted(target string) (bool, error) {
 	}
 
 	return targetFound, nil
+}
+
+// Expand 当前扩容文件系统方式是： 扩展裸盘文件系统
+func (m *mounter) Expand(fsType, source string) (bool, error) {
+	expandCmdForEXT := "resize2fs"
+	expandCmdForXFS := "xfs_growfs"
+	if fsType == "xfs" {
+		out, err := exec.Command(expandCmdForXFS, []string{source}...).CombinedOutput()
+		if err != nil {
+			if strings.TrimSpace(string(out)) == "" {
+				return false, nil
+			}
+			return false, fmt.Errorf("xfs filesystem expand failed: %v cmd: %q output: %q",
+				err, expandCmdForXFS, string(out))
+		} else {
+			return true, nil
+		}
+	}
+	if fsType == "ext4" || fsType == "ext3" || fsType == "ext2" {
+		out, err := exec.Command(expandCmdForEXT, []string{source}...).CombinedOutput()
+		if err != nil {
+			if strings.TrimSpace(string(out)) == "" {
+				return false, nil
+			}
+			return false, fmt.Errorf("ext filesystem expand failed: %v cmd: %q output: %q",
+				err, expandCmdForEXT, string(out))
+		} else {
+			return true, nil
+		}
+	}
+	return false, errors.New("not supported fs type")
 }

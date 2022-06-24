@@ -256,6 +256,9 @@ func NewFakeMounter() *fakeMounter {
 	return &fakeMounter{}
 }
 
+func (f *fakeMounter) Expand(fsType, source string) (bool, error) {
+	return false, nil
+}
 func (f *fakeMounter) Format(source string, fsType string) error {
 	return nil
 }
