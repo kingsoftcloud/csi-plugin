@@ -322,7 +322,7 @@ func (cs *KscEBSControllerServer) ControllerUnpublishVolume(ctx context.Context,
 
 // ControllerPublishVolume attaches the given volume to the node
 func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	publishInfoVolumeName := cs.config.DriverName + "/volume-name"
+	//publishInfoVolumeName := cs.config.DriverName + "/volume-name"
 
 	if req.VolumeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Volume ID must be provided")
@@ -360,13 +360,14 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 			glog.Info("volume is already attached")
 			return &csi.ControllerPublishVolumeResponse{
 				PublishContext: map[string]string{
-					publishInfoVolumeName: vol.VolumeName,
+					"MountPoint": attachment.MountPoint,
+					//publishInfoVolumeName: vol.VolumeName,
 				},
 			}, nil
 		}
 	}
 	// node is attached to a different node, return an error
-	if attachedID != "" {
+	if len(attachedID) > 0 {
 		return nil, status.Errorf(codes.FailedPrecondition,
 			"volume is attached to the wrong node(%q), dettach the volume to fix it", attachedID)
 	}
@@ -564,14 +565,23 @@ func GetK8sClientWrapper(k8sclient *k8sclient.Clientset) K8sClientWrapper {
 }
 
 func (kc *K8sClientWrap) GetNodeRegionZone() (string, string, error) {
-	var randNode k8s_v1.Node
-
+	var randNodes []k8s_v1.Node
+	//TODO meta_v1.ListOptions 选择不了特定标签
 	nodes, err := kc.k8sclient.CoreV1().Nodes().List(context.Background(), meta_v1.ListOptions{})
 	if err != nil {
 		return "", "", err
 	}
 
 	rand.Seed(time.Now().UnixNano())
-	randNode = nodes.Items[rand.Intn(len(nodes.Items))]
+	// sc 没有声明region和AZ, 这里只随机选择role为node的可用区
+	for _, v := range nodes.Items {
+		if role, ok := v.Labels[util.NodeRoleKey]; ok {
+			if role == "node" {
+				randNodes = append(randNodes, v)
+			}
+		}
+	}
+	randNode := randNodes[rand.Intn(len(randNodes))]
+
 	return randNode.Labels[util.NodeRegionKey], randNode.Labels[util.NodeZoneKey], nil
 }
