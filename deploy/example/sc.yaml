@@ -10,3 +10,25 @@ parameters:
   # zone: cn-beijing-6a
   chargetype: Daily
   purchasetime: "10"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    meta.helm.sh/release-name: js-csi-diskplugin
+    meta.helm.sh/release-namespace: miks
+  creationTimestamp: "2022-06-24T10:23:26Z"
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  name: js-sc
+  resourceVersion: "295212765"
+  uid: 64c28d24-0790-4de2-91dc-a29ef98820e6
+parameters:
+  chargetype: Daily
+  region: eu-east-1
+  tags: cop.xiaomi_owt.inf_pdl.miks.miks-cluster~mos1-serving-k8s
+  type: SSD3.0
+  zone: eu-east-1a
+provisioner: com.ksc.csi.diskplugin
+reclaimPolicy: Delete
+volumeBindingMode: Immediate

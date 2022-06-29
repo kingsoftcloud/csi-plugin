@@ -23,13 +23,18 @@ type StorageService interface {
 
 type VolumeStatusType string
 
+var VolumeTypes = []string{SSD2_0, SSD3_0, SATA3_0, EHDD, "ESSD_PL1", "ESSD_PL2", "ESSD_PL3"}
+
 const (
 	Separator = "&"
 
 	// volume type
 	SSD2_0  string = "SSD2.0"
 	SSD3_0  string = "SSD3.0"
-	SATA2_0 string = "SATA2.0"
+	SATA3_0 string = "SATA3.0"
+	EHDD    string = "EHDD"
+
+	VolumeTypesRegexp = "^(SSD2.0|SSD3.0|SATA3.0|ESSD_PL1|ESSD_PL2|ESSD_PL3|EHDD)$"
 
 	// volume size
 	// 单位 GB
@@ -96,7 +101,7 @@ func (cv *CreateVolumeReq) ToQuery() string {
 		querySlice = append(querySlice, fmt.Sprintf("VolumeName=%v", cv.VolumeName))
 	}
 	if cv.VolumeType != "" {
-		for _, vt := range []string{SSD2_0, SSD3_0, SATA2_0} {
+		for _, vt := range VolumeTypes {
 			if cv.VolumeType != vt {
 				continue
 			}
@@ -222,9 +227,7 @@ func (lv *ListVolumesReq) ToQuery() string {
 		querySlice = append(querySlice, fmt.Sprintf("VolumeStatus=%v", lv.VolumeStatus))
 	}
 
-	for _, vt := range []string{
-		SSD2_0, SSD3_0, SATA2_0,
-	} {
+	for _, vt := range VolumeTypes {
 		if lv.VolumeType != vt {
 			continue
 		}

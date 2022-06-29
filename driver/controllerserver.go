@@ -187,6 +187,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	if err != nil {
 		return nil, err
 	}
+
 	createVolumeReq := &ebsClient.CreateVolumeReq{
 		AvailabilityZone: zone,
 		VolumeName:       volumeName,
@@ -195,7 +196,11 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		ChargeType:       chargeType,
 		VolumeType:       volumeType,
 		ProjectId:        projectId,
-		Tags:             tags,
+		//Tags:             tags,
+	}
+
+	if len(tags) > 0 {
+		createVolumeReq.Tags = tags
 	}
 
 	purchaseTime, err := strconv.Atoi(parameters.Get("purchasetime", defaultPurchaseTime))
@@ -247,7 +252,7 @@ func (cs *KscEBSControllerServer) delvolume(delVol *ebsClient.Volume, size int64
 func parseTags(p string) (map[string]string, error) {
 	res := make(map[string]string)
 	parts := strings.Split(p, ";")
-	fmt.Println(parts)
+	//fmt.Println(parts)
 	if len(parts) > 5 {
 		return nil, errors.New("the number of labels cannot exceed 5")
 	}

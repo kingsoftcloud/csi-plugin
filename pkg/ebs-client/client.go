@@ -263,7 +263,7 @@ const (
 var (
 	ParamsRegexp = map[RegexpType]*regexp.Regexp{
 		VolumeNameRegexp:       regexp.MustCompile(`(^$|^[a-zA-Z0-9\-_]{2,128}$)`),
-		VolumeTypeRegexp:       regexp.MustCompile(fmt.Sprintf("^(%s|%s|%s)$", SSD2_0, SSD3_0, SATA2_0)),
+		VolumeTypeRegexp:       regexp.MustCompile(VolumeTypesRegexp),
 		VolumeDescRegexp:       regexp.MustCompile(`(^$|^.{1,128}$)`),
 		AvailabilityZoneRegexp: regexp.MustCompile(`^[a-zA-Z0-9\-_]+`),
 		ChargeTypeRegexp: regexp.MustCompile(fmt.Sprintf("^(%s|%s|%s)$", MONTHLY_CHARGE_TYPE,
