@@ -128,7 +128,7 @@ var _ = Describe("EbcClient", func() {
 			Expect(resp).NotTo(BeNil())
 			Expect(resp.VolumeId).NotTo(BeEmpty())
 
-			WaitVolumeStatus(client, resp.VolumeId, AVAILABLE_STATUS)
+			WaitVolumeStatus(client, resp.VolumeId, AVAILABLE_STATUS, "")
 
 			By("cleaning up deleting the volume")
 			deleteVolumeReq := &DeleteVolumeReq{

@@ -391,7 +391,7 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 
 	// waiting until volume is available
 	if vol.VolumeStatus != ebsClient.AVAILABLE_STATUS {
-		if err := ebsClient.WaitVolumeStatus(cs.ebsClient, vol.VolumeId, ebsClient.AVAILABLE_STATUS); err != nil {
+		if err := ebsClient.WaitVolumeStatus(cs.ebsClient, vol.VolumeId, ebsClient.AVAILABLE_STATUS, req.NodeId); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -407,7 +407,7 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 	}
 
 	// waiting until volume is attached
-	if err := ebsClient.WaitVolumeStatus(cs.ebsClient, req.VolumeId, ebsClient.INUSE_STATUS); err != nil {
+	if err := ebsClient.WaitVolumeStatus(cs.ebsClient, req.VolumeId, ebsClient.INUSE_STATUS, req.NodeId); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	glog.Info("volume attached")

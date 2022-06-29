@@ -188,11 +188,11 @@ func (cli *Client) ValidateAttachInstance(validateAttachInstanceReq *ValidateAtt
 	return validateAttachInstanceResp, nil
 }
 
-func WaitVolumeStatus(storageService StorageService, volumeId string, targetStatus VolumeStatusType) error {
+func WaitVolumeStatus(storageService StorageService, volumeId string, targetStatus VolumeStatusType, nodeID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	ticker := time.NewTicker(time.Second * 3)
+	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
 
 	for {
@@ -211,7 +211,7 @@ func WaitVolumeStatus(storageService StorageService, volumeId string, targetStat
 				continue
 			}
 			vol := listVolumesResp.Volumes[0]
-			glog.Infof("wating for volume status: %v, current status: %v", targetStatus, vol.VolumeStatus)
+			glog.Infof("volumeID: %s,nodeID: %s, wating for volume status: %v, current status: %v", volumeId, nodeID, targetStatus, vol.VolumeStatus)
 			if vol.VolumeStatus == targetStatus {
 				return nil
 			}
