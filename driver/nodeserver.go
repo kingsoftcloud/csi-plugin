@@ -2,6 +2,7 @@ package driver
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -248,7 +249,14 @@ func (d *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 }
 
 func (d *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	var err error
+	targetPath := req.GetVolumePath()
+	if targetPath == "" {
+		err = fmt.Errorf("NodeGetVolumeStats targetpath %v is empty", targetPath)
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	return util.GetMetrics(targetPath)
 }
 
 // TODO 目前不支持 xfs 文件系统扩容
@@ -308,7 +316,9 @@ func (d *NodeServer) getNodeServiceCapabilities() []*csi.NodeServiceCapability {
 	if d.config.EnableVolumeExpansion {
 		capabilityRpcTypes = append(capabilityRpcTypes, csi.NodeServiceCapability_RPC_EXPAND_VOLUME)
 	}
-
+	if d.config.MetricEnabled {
+		capabilityRpcTypes = append(capabilityRpcTypes, csi.NodeServiceCapability_RPC_GET_VOLUME_STATS)
+	}
 	var nodeServiceCapabilities []*csi.NodeServiceCapability
 
 	for _, one := range capabilityRpcTypes {

@@ -39,6 +39,7 @@ type Config struct {
 	MaxVolumeSize          int64
 	EbsClient              ebsClient.StorageService
 	K8sClient              *k8sclient.Clientset
+	MetricEnabled          bool
 }
 
 func NewDriver(config *Config) *Driver {
@@ -52,11 +53,9 @@ func NewDriver(config *Config) *Driver {
 		return nil
 	}
 	driver := &Driver{
-		endpoint:         config.EndPoint,
-		identityServer:   GetIdentityServer(config),
-		controllerServer: nil,
-		nodeServer:       nil,
-		ready:            false,
+		endpoint:       config.EndPoint,
+		identityServer: GetIdentityServer(config),
+		ready:          false,
 	}
 	if config.EnableControllerServer {
 		driver.controllerServer = GetControllerServer(config)
@@ -126,7 +125,7 @@ func ParseEndpoint(ep string) (string, string, error) {
 			return s[0], s[1], nil
 		}
 	}
-	return "", "", fmt.Errorf("Invalid endpoint: %v", ep)
+	return "", "", fmt.Errorf("invalid endpoint: %v", ep)
 }
 
 func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {

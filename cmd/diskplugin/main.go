@@ -3,7 +3,6 @@ package main
 import (
 	"csi-plugin/driver"
 	ebsClient "csi-plugin/pkg/ebs-client"
-	"encoding/json"
 	"flag"
 	"os"
 	"os/signal"
@@ -23,7 +22,7 @@ import (
 
 const (
 	driverName = "com.ksc.csi.diskplugin"
-	version    = "0.1"
+	version    = "2.0"
 )
 
 var (
@@ -44,6 +43,7 @@ var (
 	region          = flag.String("region", "", "")
 	timeout         = flag.Duration("timeout", 30*time.Second, "Timeout specifies a time limit for requests made by this Client.")
 	//clusterInfoPath = flag.String("cluster-info-path", "/opt/app-agent/arrangement/clusterinfo", "")
+	metric = flag.Bool("metric", false, "Enable monitoring volume statistics")
 )
 
 func new_k8sclient() *k8sclient.Clientset {
@@ -73,21 +73,21 @@ type ClusterInfo struct {
 	Region    string `json:"region"`
 }
 
-func loadClusterInfo(clusterInfoPath string) (*ClusterInfo, error) {
-	clusterInfo := &ClusterInfo{}
-	file, err := os.Open(clusterInfoPath)
-	if err != nil {
-		glog.Error("Failed to read clusterinfo: ", err)
-		return nil, err
-	}
-	defer file.Close()
-	if err = json.NewDecoder(file).Decode(clusterInfo); err != nil {
-		glog.Error("Failed to get region and accountId from clusterinfo: ", err)
-		return nil, err
-	}
-	return clusterInfo, nil
+// func loadClusterInfo(clusterInfoPath string) (*ClusterInfo, error) {
+// 	clusterInfo := &ClusterInfo{}
+// 	file, err := os.Open(clusterInfoPath)
+// 	if err != nil {
+// 		glog.Error("Failed to read clusterinfo: ", err)
+// 		return nil, err
+// 	}
+// 	defer file.Close()
+// 	if err = json.NewDecoder(file).Decode(clusterInfo); err != nil {
+// 		glog.Error("Failed to get region and accountId from clusterinfo: ", err)
+// 		return nil, err
+// 	}
+// 	return clusterInfo, nil
 
-}
+// }
 
 func getDriver() *driver.Driver {
 	/*
@@ -116,8 +116,8 @@ func getDriver() *driver.Driver {
 		DriverName:             driverName,
 		K8sClient:              new_k8sclient(),
 		EbsClient:              ebsClient.New(OpenApiConfig),
-
-		Version: version,
+		MetricEnabled:          *metric,
+		Version:                version,
 	}
 	glog.Infof("config: %v", cfg)
 	return driver.NewDriver(cfg)

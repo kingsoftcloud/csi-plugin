@@ -105,8 +105,8 @@ func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
 		sk = aksk.SK
 	}
 
-	if len(cli.region) == 0{
-		cli.region=aksk.Region
+	if len(cli.region) == 0 {
+		cli.region = aksk.Region
 	}
 	s := v4.Signer{Credentials: credentials.NewStaticCredentials(ak, sk, "")}
 	query = fmt.Sprintf("%v&Version=%v", query, Version)
@@ -157,6 +157,7 @@ func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
 		if err = json.Unmarshal(res_body, &error_resp); err != nil {
 			glog.Error("JSON unmarshal failed:", err)
 		}
+		glog.Infof("get AK: %s, SK: %s", ak, sk)
 		return res_body, errors.New(error_resp.Error.Message)
 	}
 

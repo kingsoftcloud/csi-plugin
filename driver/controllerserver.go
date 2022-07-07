@@ -313,6 +313,15 @@ func (cs *KscEBSControllerServer) ControllerUnpublishVolume(ctx context.Context,
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
+	if len(ebs.Attachments) > 0 {
+		if ebs.Attachments[0].InstanceId != req.NodeId {
+			glog.Infof("volume id: %s, volume status %s, target node id: %s. volume is used by other node: %s.", req.VolumeId, ebs.VolumeStatus, req.NodeId, ebs.Attachments[0].InstanceId)
+			return &csi.ControllerUnpublishVolumeResponse{}, nil
+		}
+	} else {
+		glog.Fatalf("volume id: %s, volume status %s, target node id: %s. volume is not used. please contact ebs", req.VolumeId, ebs.VolumeStatus, req.NodeId)
+	}
+
 	detachVolumeReq := &ebsClient.DetachVolumeReq{
 		VolumeId:   req.VolumeId,
 		InstanceId: req.NodeId,

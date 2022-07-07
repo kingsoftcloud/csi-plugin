@@ -1,5 +1,5 @@
 #VERSION ?= latest
-VERSION ?= 1.6.0
+VERSION ?= 1.7.0-metrics
 #VERSION ?= xqtest
 ARCH ?= amd64
 
