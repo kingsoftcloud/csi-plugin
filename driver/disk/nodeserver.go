@@ -80,17 +80,14 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		return nil, status.Error(codes.InvalidArgument, "NodeStageVolume Volume Capability must be provided")
 	}
 
-	// if _, ok := req.GetPublishContext()[publishInfoVolumeName]; !ok {
-	// 	return nil, status.Error(codes.InvalidArgument, "Could not find the volume by name")
-	// }
 	devMountPoint, ok := req.GetPublishContext()["MountPoint"]
 	if !ok {
-		return nil, status.Error(codes.InvalidArgument, "controller attach, Could not find the dev in node")
+		return nil, status.Errorf(codes.InvalidArgument, "node stage volume, could not find the dev disk in node")
 	}
 	glog.Infof("dev attach point:  %s", devMountPoint)
 	// TODO  这里使用 /dev/disk/by-id/virtio-* 挂载，因为 openapi 返回的挂载点有时候与node实际挂载点（/dev/vd*）不符
 	source := getDiskSource(req.VolumeId)
-	//source := mountPoint
+	//source := devMountPoint
 	target := req.StagingTargetPath
 
 	mnt := req.VolumeCapability.GetMount()
@@ -349,7 +346,7 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 	resp := &csi.NodeGetInfoResponse{
 		NodeId: d.nodeID,
 		//refer to  https://docs.ksyun.com/documents/5423 "单实例云硬盘数量"
-		MaxVolumesPerNode: 8,
+		MaxVolumesPerNode: d.config.MaxVolumesPerNode,
 		// make sure that the driver works on this particular region only
 		AccessibleTopology: &csi.Topology{
 			Segments: map[string]string{

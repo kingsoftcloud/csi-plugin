@@ -194,7 +194,7 @@ func (m *mounter) Unmount(target string) error {
 		return fmt.Errorf("unmounting failed: %v cmd: '%s %s' output: %q",
 			err, umountCmd, target, string(out))
 	}
-
+	glog.Infof("executing umount command result: %s", string(out))
 	return nil
 }
 

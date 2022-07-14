@@ -1,7 +1,8 @@
 package main
 
 import (
-	"csi-plugin/driver"
+	ebs "csi-plugin/driver/disk"
+	nfs "csi-plugin/driver/nfs"
 	ebsClient "csi-plugin/pkg/ebs-client"
 	"flag"
 	"os"
@@ -21,19 +22,20 @@ import (
 )
 
 const (
-	driverName = "com.ksc.csi.diskplugin"
-	version    = "2.0"
+	EBSdriverName = "com.ksc.csi.diskplugin"
+	NFSDriverName = "com.kce.csi.nfs"
+	version       = "1.6.0"
 )
 
 var (
 	endpoint         = flag.String("endpoint", "unix://tmp/csi.sock", "CSI endpoint")
 	master           = flag.String("master", "", "Master URL to build a client config from. Either this or kubeconfig needs to be set if the provisioner is being run out of cluster.")
 	kubeconfig       = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file. Either this or master needs to be set if the provisioner is being run out of cluster.")
-	controllerServer = flag.Bool("controller-server", false, "value: controller-server=true|false")
+	controllerServer = flag.Bool("controller-server", true, "value: controller-server=true|false")
 	nodeServer       = flag.Bool("node-server", false, "value: node-server=true|false")
 
 	volumeExpansion = flag.Bool("node-expand-required", true, "Enables NodeServiceCapability_RPC_EXPAND_VOLUME capacity.")
-	maxVolumeSize   = flag.Int64("max-volume-size", 500, "maximum size of volumes in GB (inclusive)")
+	maxVolumeSize   = flag.Int64("max-volume-size", 16000, "maximum size of volumes in GB (inclusive)")
 
 	accessKeyId     = flag.String("access-key-id", "", "")
 	accessKeySecret = flag.String("access-key-secret", "", "")
@@ -43,7 +45,9 @@ var (
 	region          = flag.String("region", "", "")
 	timeout         = flag.Duration("timeout", 30*time.Second, "Timeout specifies a time limit for requests made by this Client.")
 	//clusterInfoPath = flag.String("cluster-info-path", "/opt/app-agent/arrangement/clusterinfo", "")
-	metric = flag.Bool("metric", false, "Enable monitoring volume statistics")
+	metric            = flag.Bool("metric", false, "Enable monitoring volume statistics")
+	driverName        = flag.String("driver", EBSdriverName, "CSI Driver")
+	maxVolumesPerNode = flag.Int64("max-volumes-pernode", 8, "Only EBS: maximum number of volumes that can be attached to node")
 )
 
 func new_k8sclient() *k8sclient.Clientset {
@@ -73,31 +77,7 @@ type ClusterInfo struct {
 	Region    string `json:"region"`
 }
 
-// func loadClusterInfo(clusterInfoPath string) (*ClusterInfo, error) {
-// 	clusterInfo := &ClusterInfo{}
-// 	file, err := os.Open(clusterInfoPath)
-// 	if err != nil {
-// 		glog.Error("Failed to read clusterinfo: ", err)
-// 		return nil, err
-// 	}
-// 	defer file.Close()
-// 	if err = json.NewDecoder(file).Decode(clusterInfo); err != nil {
-// 		glog.Error("Failed to get region and accountId from clusterinfo: ", err)
-// 		return nil, err
-// 	}
-// 	return clusterInfo, nil
-
-// }
-
-func getDriver() *driver.Driver {
-	/*
-		ci, err := loadClusterInfo(*clusterInfoPath)
-		if err != nil {
-			panic(err)
-		}
-		glog.Infof("cluster info: %v", ci)
-	*/
-
+func getDriver() *ebs.Driver {
 	OpenApiConfig := &api.ClientConfig{
 		AccessKeyId:     *accessKeyId,
 		AccessKeySecret: *accessKeySecret,
@@ -107,29 +87,48 @@ func getDriver() *driver.Driver {
 		Timeout:         *timeout,
 	}
 
-	cfg := &driver.Config{
+	cfg := &ebs.Config{
 		EndPoint:               *endpoint,
 		EnableNodeServer:       *nodeServer,
 		EnableControllerServer: *controllerServer,
 		EnableVolumeExpansion:  *volumeExpansion,
 		MaxVolumeSize:          *maxVolumeSize,
-		DriverName:             driverName,
+		DriverName:             *driverName,
 		K8sClient:              new_k8sclient(),
 		EbsClient:              ebsClient.New(OpenApiConfig),
 		MetricEnabled:          *metric,
 		Version:                version,
+		MaxVolumesPerNode:      *maxVolumesPerNode,
 	}
-	glog.Infof("config: %v", cfg)
-	return driver.NewDriver(cfg)
+	glog.Infof("disk driver config: %+v", cfg)
+
+	return ebs.NewDriver(cfg)
 }
 
 func main() {
 	flag.Parse()
-	glog.Infof("CSI plugin, version: %s, endpoint: %v, http client timeout: %v", version, *endpoint, *timeout)
+	glog.Infof("CSI Driver Name: %s, version: %s, endPoints: %s", *driverName, version, *endpoint)
 
 	util.InitAksk(new_k8sclient())
 	stop := make(chan struct{})
-	d := getDriver()
+	switch *driverName {
+	case EBSdriverName:
+		d := getDriver()
+		go func() {
+			if err := d.Run(); err != nil {
+				glog.Fatal(err)
+				d.Stop()
+				stop <- struct{}{}
+			}
+		}()
+	case NFSDriverName:
+		// TODO
+		r := nfs.NewDriver(nil)
+		r.Run()
+		r.Stop()
+		stop <- struct{}{}
+	}
+
 	go func() {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
@@ -137,14 +136,8 @@ func main() {
 		glog.Infof("got system signal: %v, exiting", s)
 		stop <- struct{}{}
 	}()
-	go func() {
-		if err := d.Run(); err != nil {
-			glog.Fatal(err)
-			stop <- struct{}{}
-		}
-	}()
 
 	<-stop
-	d.Stop()
+	//d.Stop()
 
 }

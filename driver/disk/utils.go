@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	ebsClient "csi-plugin/pkg/ebs-client"
-
 	"github.com/container-storage-interface/spec/lib/go/csi"
 )
 
@@ -58,16 +56,6 @@ func validateCapabilities(caps []*csi.VolumeCapability) bool {
 	}
 
 	return supported
-}
-
-func volumeAlreadyCreated(c ebsClient.StorageService, volumeName string) (bool, error) {
-	resp, err := c.GetVolumeByName(&ebsClient.ListVolumesReq{
-		VolumeExactName: volumeName,
-	})
-	if err != nil {
-		return false, err
-	}
-	return resp.TotalCount > 0, nil
 }
 
 // extractStorage extracts the storage size in bytes from the given capacity

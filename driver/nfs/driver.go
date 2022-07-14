@@ -53,15 +53,15 @@ func NewDriver(config *Config) *Driver {
 		return nil
 	}
 	driver := &Driver{
-		endpoint:       config.EndPoint,
-		identityServer: GetIdentityServer(config),
-		ready:          false,
+		endpoint: config.EndPoint,
+		//identityServer: GetIdentityServer(config),
+		ready: false,
 	}
 	if config.EnableControllerServer {
-		driver.controllerServer = GetControllerServer(config)
+		//driver.controllerServer = GetControllerServer(config)
 	}
 	if config.EnableNodeServer {
-		driver.nodeServer = GetNodeServer(config)
+		//driver.nodeServer = GetNodeServer(config)
 	}
 
 	return driver
