@@ -420,6 +420,8 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	glog.Info("volume attached")
+	// 给openapi和cinder异步任务执行时间
+	time.Sleep(5 * time.Second)
 	return &csi.ControllerPublishVolumeResponse{
 		PublishContext: map[string]string{
 			//publishInfoVolumeName: vol.VolumeName,

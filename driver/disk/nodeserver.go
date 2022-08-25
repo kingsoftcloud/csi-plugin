@@ -13,7 +13,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	//"k8s.io/klog"
 	"csi-plugin/util"
+
+	mountutils "k8s.io/mount-utils"
 
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -87,6 +90,13 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	glog.Infof("dev attach point:  %s", devMountPoint)
 	// TODO  这里使用 /dev/disk/by-id/virtio-* 挂载，因为 openapi 返回的挂载点有时候与node实际挂载点（/dev/vd*）不符
 	source := getDiskSource(req.VolumeId)
+
+	// 判断disk软链接是否生成
+	ok, err := mountutils.PathExists(source)
+	if err != nil || !ok {
+		return nil, status.Errorf(codes.NotFound, "failed to check if path %q exists: %v", source, err)
+	}
+
 	//source := devMountPoint
 	target := req.StagingTargetPath
 
@@ -133,6 +143,26 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	}
 	glog.Info("formatting and mounting stage volume is finished")
 	return &csi.NodeStageVolumeResponse{}, nil
+}
+
+// TODO
+// findDevicePath finds path of device and verifies its existence
+// if the device is not nvme, return the path directly
+// if the device is nvme, finds and returns the nvme device path eg. /dev/nvme1n1
+func (d *NodeServer) findDevicePath(devicePath, volumeID, partition string) (string, error) {
+	canonicalDevicePath := ""
+
+	// If the given path exists, the device MAY be nvme. Further, it MAY be a
+	// symlink to the nvme device path like:
+	// | $ stat /dev/xvdba
+	// | File: ‘/dev/xvdba’ -> ‘nvme1n1’
+	// Since these are maybes, not guarantees, the search for the nvme device
+	// path below must happen and must rely on volume ID
+	_, err := d.mounter.PathExists(devicePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to check if path %q exists: %v", devicePath, err)
+	}
+	return canonicalDevicePath, nil
 }
 
 func (d *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {

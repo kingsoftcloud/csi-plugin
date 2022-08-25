@@ -1,9 +1,0 @@
-make --dry-run --always-make --keep-going --print-directory
-make: Entering directory '/root/code/go/src/kce/csi-plugin'
-rm -rf csi-plugin
-mkdir -p bin
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o ./bin/csi-diskplugin ./cmd/diskplugin
-docker build -t hub.kce.ksyun.com/ksyun/csi-diskplugin:1.5.2-test-amd64 -f Dockerfile.amd64 .
- 
-make: Leaving directory '/root/code/go/src/kce/csi-plugin'
- 

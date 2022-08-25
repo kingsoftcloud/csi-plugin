@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	mountutils "k8s.io/mount-utils"
 )
 
 type findmntResponse struct {
@@ -43,6 +44,8 @@ type Mounter interface {
 	IsMounted(target string) (bool, error)
 	//Expand FileSystem only xfs and ext*(2,3,4) support expand
 	Expand(fsType, source string) (bool, error)
+
+	PathExists(path string) (bool, error)
 }
 
 // TODO(arslan): this is Linux only for now. Refactor this into a package with
@@ -54,6 +57,12 @@ type mounter struct {
 // newMounter returns a new mounter instance
 func newMounter() *mounter {
 	return &mounter{}
+}
+
+// This function is mirrored in ./sanity_test.go to make sure sanity test covered this block of code
+// Please mirror the change to func MakeFile in ./sanity_test.go
+func (m *mounter) PathExists(path string) (bool, error) {
+	return mountutils.PathExists(path)
 }
 
 func (m *mounter) Format(source, fsType string) error {
