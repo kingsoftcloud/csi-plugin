@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -118,13 +118,13 @@ func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
 	req.URL.RawQuery = query
 	_, err := s.Sign(req, body, service, cli.region, time.Now())
 	if err != nil {
-		glog.Error("Request Sign failed: ", err)
+		klog.Error("Request Sign failed: ", err)
 		return nil, err
 	}
-	glog.Info("Do HTTP Request: ", query)
+	klog.V(5).Info("Do HTTP Request: ", query)
 	resp, err := cli.httpClient.Do(req)
 	if err != nil {
-		glog.Error("HTTP Request failed: ", err)
+		klog.Error("HTTP Request failed: ", err)
 		return nil, err
 	}
 	statusCode := resp.StatusCode
@@ -133,14 +133,14 @@ func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
 	res_body, err := ioutil.ReadAll(resp.Body)
 
 	if err != nil {
-		glog.Error("Get Response failed: ", err)
+		klog.Error("Get Response failed: ", err)
 		return nil, err
 	}
 	//TODO:
 	if len(res_body) > 1024 {
-		glog.Info("OpenAPI return: ", string(res_body[:1024]))
+		klog.V(5).Info("OpenAPI return: ", string(res_body[:1024]))
 	} else {
-		glog.Info("OpenAPI return: ", string(res_body))
+		klog.V(5).Info("OpenAPI return: ", string(res_body))
 	}
 
 	type Error struct {
@@ -155,9 +155,9 @@ func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
 	if statusCode >= 400 && statusCode <= 599 {
 		var error_resp ErrorResponse
 		if err = json.Unmarshal(res_body, &error_resp); err != nil {
-			glog.Error("JSON unmarshal failed:", err)
+			klog.Error("JSON unmarshal failed:", err)
 		}
-		glog.Infof("get AK: %s, SK: %s", ak, sk)
+		klog.V(5).Infof("get AK: %s, SK: %s", ak, sk)
 		return res_body, errors.New(error_resp.Error.Message)
 	}
 

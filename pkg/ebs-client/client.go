@@ -13,9 +13,9 @@ import (
 
 	api "csi-plugin/pkg/open-api"
 
-	"github.com/golang/glog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/klog"
 )
 
 const (
@@ -46,7 +46,7 @@ func (cli *Client) CreateVolume(createVolumeReq *CreateVolumeReq) (*CreateVolume
 
 	err = json.Unmarshal(resp, &createVolumeResp)
 	if err != nil {
-		glog.Error("Error decoding json: ", err)
+		klog.Error("Error decoding json: ", err)
 		return nil, err
 	}
 
@@ -64,7 +64,7 @@ func (cli *Client) DeleteVolume(deleteVolumeReq *DeleteVolumeReq) (*DeleteVolume
 
 	err = json.Unmarshal(resp, deleteVolumeResp)
 	if err != nil {
-		glog.Error("Error decoding json: ", err)
+		klog.Error("Error decoding json: ", err)
 		return nil, err
 	}
 	if !deleteVolumeResp.Return {
@@ -203,15 +203,15 @@ func WaitVolumeStatus(storageService StorageService, volumeId string, targetStat
 			}
 			listVolumesResp, err := storageService.ListVolumes(listVolumesReq)
 			if err != nil {
-				glog.Errorf("waitVolumeStatus:ListVolumes %v error: %v", volumeId, err)
+				klog.Errorf("waitVolumeStatus:ListVolumes %v error: %v", volumeId, err)
 				continue
 			}
 			if len(listVolumesResp.Volumes) == 0 {
-				glog.Errorf("waitVolumeStatus:ListVolumes error: volume %v not found", volumeId)
+				klog.Errorf("waitVolumeStatus:ListVolumes error: volume %v not found", volumeId)
 				continue
 			}
 			vol := listVolumesResp.Volumes[0]
-			glog.Infof("volumeID: %s,nodeID: %s, wating for volume status: %v, current status: %v", volumeId, nodeID, targetStatus, vol.VolumeStatus)
+			klog.V(5).Infof("volumeID: %s,nodeID: %s, wating for volume status: %v, current status: %v", volumeId, nodeID, targetStatus, vol.VolumeStatus)
 			if vol.VolumeStatus == targetStatus {
 				return nil
 			}

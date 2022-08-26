@@ -9,7 +9,8 @@ import (
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
+	"k8s.io/klog"
+
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
 
 	"context"
@@ -45,12 +46,12 @@ type Config struct {
 
 func NewDriver(config *Config) *Driver {
 	if config.DriverName == "" {
-		glog.Errorf("Driver name missing")
+		klog.Errorf("Driver name missing")
 		return nil
 	}
 	// TODO version format and validation
 	if len(config.Version) == 0 {
-		glog.Errorf("Version argument missing")
+		klog.Errorf("Version argument missing")
 		return nil
 	}
 	driver := &Driver{
@@ -71,21 +72,21 @@ func NewDriver(config *Config) *Driver {
 func (d *Driver) Run() error {
 	proto, addr, err := ParseEndpoint(d.endpoint)
 	if err != nil {
-		glog.Fatal(err.Error())
+		klog.Fatal(err.Error())
 		return err
 	}
 
 	if proto == "unix" {
 		addr = "/" + addr
 		if err := os.Remove(addr); err != nil && !os.IsNotExist(err) {
-			glog.Fatalf("Failed to remove %s, error: %s", addr, err.Error())
+			klog.Fatalf("Failed to remove %s, error: %s", addr, err.Error())
 			return err
 		}
 	}
 
 	listener, err := net.Listen(proto, addr)
 	if err != nil {
-		glog.Fatalf("Failed to listen: %v", err)
+		klog.Fatalf("Failed to listen: %v", err)
 		return err
 	}
 
@@ -102,7 +103,7 @@ func (d *Driver) Run() error {
 		csi.RegisterNodeServer(d.srv, d.nodeServer)
 	}
 
-	glog.Infof("Listening for connections on address: %#v", listener.Addr())
+	klog.V(5).Infof("Listening for connections on address: %#v", listener.Addr())
 	return d.srv.Serve(listener)
 }
 
@@ -111,7 +112,7 @@ func (d *Driver) Stop() {
 	d.ready = false
 	d.readyMu.Unlock()
 
-	glog.Info("server stopped")
+	klog.V(5).Info("server stopped")
 	d.srv.GracefulStop()
 }
 
@@ -131,13 +132,13 @@ func ParseEndpoint(ep string) (string, string, error) {
 
 func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	fmt.Println()
-	glog.V(3).Infof("GRPC call: %s", info.FullMethod)
-	glog.V(5).Infof("GRPC request: %s", protosanitizer.StripSecretsCSI03(req))
+	klog.V(3).Infof("GRPC call: %s", info.FullMethod)
+	klog.V(5).Infof("GRPC request: %s", protosanitizer.StripSecretsCSI03(req))
 	resp, err := handler(ctx, req)
 	if err != nil {
-		glog.Errorf("GRPC error: %v", err)
+		klog.Errorf("GRPC error: %v", err)
 	} else {
-		glog.V(5).Infof("GRPC response: %s", protosanitizer.StripSecretsCSI03(resp))
+		klog.V(5).Infof("GRPC response: %s", protosanitizer.StripSecretsCSI03(resp))
 	}
 	return resp, err
 }

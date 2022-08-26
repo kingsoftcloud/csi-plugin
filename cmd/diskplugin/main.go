@@ -14,11 +14,10 @@ import (
 
 	"csi-plugin/util"
 
-	"github.com/golang/glog"
-
 	k8sclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
 )
 
 const (
@@ -48,24 +47,27 @@ var (
 	metric            = flag.Bool("metric", false, "Enable monitoring volume statistics")
 	driverName        = flag.String("driver", EBSdriverName, "CSI Driver")
 	maxVolumesPerNode = flag.Int64("max-volumes-pernode", 8, "Only EBS: maximum number of volumes that can be attached to node")
+	//nfs
+	mountPermissions = flag.Uint64("mount-permissions", 0777, "mounted folder permissions")
+	workingMountDir  = flag.String("working-mount-dir", "/tmp", "working directory for provisioner to mount nfs shares temporarily")
 )
 
 func new_k8sclient() *k8sclient.Clientset {
 	var config *rest.Config
 	var err error
 	if *master != "" || *kubeconfig != "" {
-		glog.Infof("Either master or kubeconfig specified. building kube config from that..")
+		klog.V(5).Infof("Either master or kubeconfig specified. building kube config from that..")
 		config, err = clientcmd.BuildConfigFromFlags(*master, *kubeconfig)
 	} else {
-		glog.Infof("Building kube configs for running in cluster...")
+		klog.V(5).Infof("Building kube configs for running in cluster...")
 		config, err = rest.InClusterConfig()
 	}
 	if err != nil {
-		glog.Fatalf("Failed to create config: %v", err)
+		klog.Fatalf("Failed to create config: %v", err)
 	}
 	clientset, err := k8sclient.NewForConfig(config)
 	if err != nil {
-		glog.Fatalf("Failed to create client: %v", err)
+		klog.Fatalf("Failed to create client: %v", err)
 	}
 
 	return clientset
@@ -77,7 +79,7 @@ type ClusterInfo struct {
 	Region    string `json:"region"`
 }
 
-func getDriver() *ebs.Driver {
+func getEBSDriver() *ebs.Driver {
 	OpenApiConfig := &api.ClientConfig{
 		AccessKeyId:     *accessKeyId,
 		AccessKeySecret: *accessKeySecret,
@@ -100,30 +102,45 @@ func getDriver() *ebs.Driver {
 		Version:                version,
 		MaxVolumesPerNode:      *maxVolumesPerNode,
 	}
-	glog.Infof("disk driver config: %+v", cfg)
+	klog.V(5).Infof("disk driver config: %+v", cfg)
 
 	return ebs.NewDriver(cfg)
 }
 
+func getNFSDriver() *nfs.Driver {
+	nodeID,err:= util.GetSystemUUID()
+	if err !=nil{
+		klog.Warning("nodeid is empty")
+	}
+	driverOptions := nfs.DriverOptions{
+		NodeID:           nodeID,
+		DriverName:       *driverName,
+		Endpoint:         *endpoint,
+		MountPermissions: *mountPermissions,
+		WorkingMountDir:  *workingMountDir,
+	}
+	return  nfs.NewDriver(&driverOptions)
+
+}
 func main() {
 	flag.Parse()
-	glog.Infof("CSI Driver Name: %s, version: %s, endPoints: %s", *driverName, version, *endpoint)
+	klog.V(5).Infof("CSI Driver Name: %s, version: %s, endPoints: %s", *driverName, version, *endpoint)
 
 	util.InitAksk(new_k8sclient())
 	stop := make(chan struct{})
 	switch *driverName {
 	case EBSdriverName:
-		d := getDriver()
+		d := getEBSDriver()
 		go func() {
 			if err := d.Run(); err != nil {
-				glog.Fatal(err)
+				klog.Fatal(err)
 				d.Stop()
 				stop <- struct{}{}
 			}
 		}()
 	case NFSDriverName:
 		// TODO
-		r := nfs.NewDriver(nil)
+		r := getNFSDriver()
 		r.Run()
 		r.Stop()
 		stop <- struct{}{}
@@ -133,7 +150,7 @@ func main() {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 		s := <-c
-		glog.Infof("got system signal: %v, exiting", s)
+		klog.V(5).Infof("got system signal: %v, exiting", s)
 		stop <- struct{}{}
 	}()
 

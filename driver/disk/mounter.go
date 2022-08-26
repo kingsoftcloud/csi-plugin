@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	mountutils "k8s.io/mount-utils"
 )
 
@@ -91,7 +91,7 @@ func (m *mounter) Format(source, fsType string) error {
 		mkfsArgs = []string{"-F", source}
 	}
 
-	glog.Infof("executing format command, cmd: %v, args: %v", mkfsCmd, mkfsArgs)
+	klog.V(5).Infof("executing format command, cmd: %v, args: %v", mkfsCmd, mkfsArgs)
 	out, err := exec.Command(mkfsCmd, mkfsArgs...).CombinedOutput()
 	if err != nil {
 		//  TODO error:
@@ -162,8 +162,8 @@ func (m *mounter) Mount(source, target, fsType string, opts ...string) error {
 
 	// }
 	// fileinfo, _ = os.Stat(target)
-	glog.Infof("source mode: %d", uint32(fileinfo.Mode().Perm()))
-	glog.Infof("executing mount command, cmd: %v, args: %v", mountCmd, mountArgs)
+	klog.V(5).Infof("source mode: %d", uint32(fileinfo.Mode().Perm()))
+	klog.V(5).Infof("executing mount command, cmd: %v, args: %v", mountCmd, mountArgs)
 	//err = syscall.Mount(source, target, fsType, 0, "")
 	out, err := exec.Command(mountCmd, mountArgs...).CombinedOutput()
 	if err != nil {
@@ -197,13 +197,13 @@ func (m *mounter) Unmount(target string) error {
 
 	umountArgs := []string{target}
 
-	glog.Infof("executing umount command, cmd: %v, args: %v", umountCmd, umountArgs)
+	klog.V(5).Infof("executing umount command, cmd: %v, args: %v", umountCmd, umountArgs)
 	out, err := exec.Command(umountCmd, umountArgs...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("unmounting failed: %v cmd: '%s %s' output: %q",
 			err, umountCmd, target, string(out))
 	}
-	glog.Infof("executing umount command result: %s", string(out))
+	klog.V(5).Infof("executing umount command result: %s", string(out))
 	return nil
 }
 
@@ -223,9 +223,9 @@ func (m *mounter) IsFormatted(source string) (bool, error) {
 
 	blkidArgs := []string{source}
 
-	glog.Infof("checking if source is formatted, cmd: %v, args: %v", blkidCmd, blkidArgs)
+	klog.V(5).Infof("checking if source is formatted, cmd: %v, args: %v", blkidCmd, blkidArgs)
 	out, _ := exec.Command(blkidCmd, blkidArgs...).CombinedOutput()
-	glog.Infof("exec blkid cmd, return %s.", string(out))
+	klog.V(5).Infof("exec blkid cmd, return %s.", string(out))
 	if strings.TrimSpace(string(out)) == "" {
 		return false, nil
 	}
@@ -249,7 +249,7 @@ func (m *mounter) IsMounted(target string) (bool, error) {
 
 	findmntArgs := []string{"-o", "TARGET,PROPAGATION,FSTYPE,OPTIONS", "-M", target, "-J"}
 
-	glog.Infof("checking if target is mounted, cmd: %v, args: %v", findmntCmd, findmntArgs)
+	klog.V(5).Infof("checking if target is mounted, cmd: %v, args: %v", findmntCmd, findmntArgs)
 	out, err := exec.Command(findmntCmd, findmntArgs...).CombinedOutput()
 	if err != nil {
 		// findmnt exits with non zero exit status if it couldn't find anything

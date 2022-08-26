@@ -8,12 +8,11 @@ import (
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/klog"
 
-	//"k8s.io/klog"
 	"csi-plugin/util"
 
 	mountutils "k8s.io/mount-utils"
@@ -87,7 +86,7 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "node stage volume, could not find the dev disk in node")
 	}
-	glog.Infof("dev attach point:  %s", devMountPoint)
+	klog.V(5).Infof("dev attach point:  %s", devMountPoint)
 	// TODO  这里使用 /dev/disk/by-id/virtio-* 挂载，因为 openapi 返回的挂载点有时候与node实际挂载点（/dev/vd*）不符
 	source := getDiskSource(req.VolumeId)
 
@@ -118,18 +117,18 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 		}
 
 		if !formatted {
-			glog.Info("formatting the volume for staging")
+			klog.V(5).Info("formatting the volume for staging")
 			if err := d.mounter.Format(source, fsType); err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
 		} else {
-			glog.Info("source device is already formatted")
+			klog.V(5).Info("source device is already formatted")
 		}
 
 	} else {
-		glog.Info("skipping formatting the source device")
+		klog.V(5).Info("skipping formatting the source device")
 	}
-	glog.Info("mounting the volume for staging")
+	klog.V(5).Info("mounting the volume for staging")
 	mounted, err := d.mounter.IsMounted(target)
 	if err != nil {
 		return nil, err
@@ -139,9 +138,9 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	} else {
-		glog.Info("source device is already mounted to the target path")
+		klog.V(5).Info("source device is already mounted to the target path")
 	}
-	glog.Info("formatting and mounting stage volume is finished")
+	klog.V(5).Info("formatting and mounting stage volume is finished")
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
@@ -180,16 +179,16 @@ func (d *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 	}
 
 	if mounted {
-		glog.Info("unmounting the staging target path")
+		klog.V(5).Info("unmounting the staging target path")
 		err := d.mounter.Unmount(req.StagingTargetPath)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		glog.Info("staging target path is already unmounted")
+		klog.V(5).Info("staging target path is already unmounted")
 	}
 
-	glog.Info("unmounting stage volume is finished")
+	klog.V(5).Info("unmounting stage volume is finished")
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
@@ -234,15 +233,15 @@ func (d *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 	}
 
 	if !mounted {
-		glog.Info("mounting the volume")
+		klog.V(5).Info("mounting the volume")
 		if err := d.mounter.Mount(source, target, fsType, options...); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	} else {
-		glog.Info("volume is already mounted")
+		klog.V(5).Info("volume is already mounted")
 	}
 
-	glog.Info("bind mounting the volume is finished")
+	klog.V(5).Info("bind mounting the volume is finished")
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
@@ -262,16 +261,16 @@ func (d *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	}
 
 	if mounted {
-		glog.Info("unmounting the target path")
+		klog.V(5).Info("unmounting the target path")
 		err := d.mounter.Unmount(req.TargetPath)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		glog.Info("target path is already unmounted")
+		klog.V(5).Info("target path is already unmounted")
 	}
 
-	glog.Info("unmounting volume is finished")
+	klog.V(5).Info("unmounting volume is finished")
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
@@ -318,7 +317,7 @@ func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 			return nil, status.Errorf(codes.Internal, "expand failed, fs type: %s, source: %s", "ext4", devName)
 		}
 	default:
-		glog.Errorf("not supported fsType: %s", mnt.FsType)
+		klog.Errorf("not supported fsType: %s", mnt.FsType)
 		return nil, status.Errorf(codes.InvalidArgument, "not supported fsType: %s", mnt.FsType)
 	}
 

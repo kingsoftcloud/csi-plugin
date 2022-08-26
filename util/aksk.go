@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/golang/glog"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 )
 
 const (
@@ -32,7 +32,7 @@ func InitAksk(k8sclient *k8sclient.Clientset) {
 func GetAKSK() (AKSK, error) {
 	cm, err := aksk.K8sclient.CoreV1().ConfigMaps(Namespace).Get(context.Background(), ConfigMapName, v1.GetOptions{})
 	if err != nil {
-		glog.Errorf("get configmap %v: %v", ConfigMapName, err)
+		klog.Errorf("get configmap %v: %v", ConfigMapName, err)
 		return aksk, err
 	}
 	aksk.AK = cm.Data["ak"]
@@ -44,6 +44,6 @@ func GetAKSK() (AKSK, error) {
 	}
 	aksk.SecurityToken = securityToken
 
-	//glog.Infof("get AK: %s, SK: %s, region: %s", aksk.AK, aksk.SK, aksk.Region)
+	//klog.V(5).Infof("get AK: %s, SK: %s, region: %s", aksk.AK, aksk.SK, aksk.Region)
 	return aksk, nil
 }

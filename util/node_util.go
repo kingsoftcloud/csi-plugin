@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
 	k8svol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
@@ -41,7 +41,7 @@ func GetHostname(hostnameOverride string) string {
 	if hostname == "" {
 		nodename, err := os.Hostname()
 		if err != nil {
-			glog.Fatalf("Couldn't determine hostname: %v", err)
+			klog.Fatalf("Couldn't determine hostname: %v", err)
 		}
 		hostname = nodename
 	}
@@ -118,32 +118,32 @@ func GetMetrics(path string) (*csi.NodeGetVolumeStatsResponse, error) {
 
 	metricAvailable, ok := (*(metrics.Available)).AsInt64()
 	if !ok {
-		glog.Errorf("failed to fetch available bytes for target: %s", path)
+		klog.Errorf("failed to fetch available bytes for target: %s", path)
 		return nil, status.Error(codes.Unknown, "failed to fetch available bytes")
 	}
 	metricCapacity, ok := (*(metrics.Capacity)).AsInt64()
 	if !ok {
-		glog.Errorf("failed to fetch capacity bytes for target: %s", path)
+		klog.Errorf("failed to fetch capacity bytes for target: %s", path)
 		return nil, status.Error(codes.Unknown, "failed to fetch capacity bytes")
 	}
 	metricUsed, ok := (*(metrics.Used)).AsInt64()
 	if !ok {
-		glog.Errorf("failed to fetch used bytes for target %s", path)
+		klog.Errorf("failed to fetch used bytes for target %s", path)
 		return nil, status.Error(codes.Unknown, "failed to fetch used bytes")
 	}
 	metricInodes, ok := (*(metrics.Inodes)).AsInt64()
 	if !ok {
-		glog.Errorf("failed to fetch available inodes for target %s", path)
+		klog.Errorf("failed to fetch available inodes for target %s", path)
 		return nil, status.Error(codes.Unknown, "failed to fetch available inodes")
 	}
 	metricInodesFree, ok := (*(metrics.InodesFree)).AsInt64()
 	if !ok {
-		glog.Errorf("failed to fetch free inodes for target: %s", path)
+		klog.Errorf("failed to fetch free inodes for target: %s", path)
 		return nil, status.Error(codes.Unknown, "failed to fetch free inodes")
 	}
 	metricInodesUsed, ok := (*(metrics.InodesUsed)).AsInt64()
 	if !ok {
-		glog.Errorf("failed to fetch used inodes for target: %s", path)
+		klog.Errorf("failed to fetch used inodes for target: %s", path)
 		return nil, status.Error(codes.Unknown, "failed to fetch used inodes")
 	}
 

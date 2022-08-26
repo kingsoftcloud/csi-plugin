@@ -7,10 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/glog"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/klog"
 )
 
 func init() {
@@ -57,7 +56,7 @@ var _ = Describe("EbcClient", func() {
 				ChargeType:       "HourlyInstantSettlement",
 			}
 			resp, err := client.CreateVolume(req)
-			glog.Info("err", err)
+			klog.V(5).Info("err", err)
 			Expect(err).To(HaveOccurred())
 			Expect(resp).To(BeNil())
 		})
@@ -69,7 +68,7 @@ var _ = Describe("EbcClient", func() {
 				ChargeType:       "HourlyInstantSettlement",
 			}
 			resp, err := client.CreateVolume(req)
-			glog.Info("err", err)
+			klog.V(5).Info("err", err)
 			Expect(err).To(HaveOccurred())
 			Expect(resp).To(BeNil())
 		})
@@ -80,7 +79,7 @@ var _ = Describe("EbcClient", func() {
 				ChargeType: "HourlyInstantSettlement",
 			}
 			resp, err := client.CreateVolume(req)
-			glog.Info("err", err)
+			klog.V(5).Info("err", err)
 			Expect(err).To(HaveOccurred())
 			Expect(resp).To(BeNil())
 		})
@@ -91,7 +90,7 @@ var _ = Describe("EbcClient", func() {
 				AvailabilityZone: "cn-beijing-6a",
 			}
 			resp, err := client.CreateVolume(req)
-			glog.Info("err", err)
+			klog.V(5).Info("err", err)
 			Expect(err).To(HaveOccurred())
 			Expect(resp).To(BeNil())
 		})
@@ -107,7 +106,7 @@ var _ = Describe("EbcClient", func() {
 			}
 			resp, err := client.CreateVolume(req)
 
-			glog.Info("err", err)
+			klog.V(5).Info("err", err)
 			Expect(err).To(HaveOccurred())
 			Expect(resp).To(BeNil())
 		})

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 type StorageService interface {
@@ -149,7 +149,7 @@ func (cv *CreateVolumeReq) ToQuery() string {
 		i := 1
 		for k, v := range cv.Tags {
 			if len(v) == 0 {
-				glog.Infof("Invalid tag: key=%s, value=%s", k, v)
+				klog.V(5).Infof("Invalid tag: key=%s, value=%s", k, v)
 				continue
 			}
 			querySlice = append(querySlice, fmt.Sprintf("Tag.%d.Key=%s", i, k))

@@ -5,7 +5,6 @@ go 1.17
 require (
 	github.com/aws/aws-sdk-go v1.44.41
 	github.com/container-storage-interface/spec v1.6.0
-	github.com/golang/glog v1.0.0
 	github.com/kubernetes-csi/csi-lib-utils v0.11.0
 	github.com/kubernetes-csi/csi-test v2.2.0+incompatible
 	github.com/onsi/ginkgo v1.16.5

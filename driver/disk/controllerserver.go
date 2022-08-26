@@ -14,13 +14,13 @@ import (
 	"csi-plugin/util"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	k8s_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 )
 
 const (
@@ -96,7 +96,7 @@ func (cs *KscEBSControllerServer) validateControllerServiceRequest(c csi.Control
 
 func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	if err := cs.validateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
-		glog.V(3).Infof("invalid create volume req: %v", req)
+		klog.V(3).Infof("invalid create volume req: %v", req)
 		return nil, err
 	}
 	// check parameters
@@ -158,7 +158,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		if vol.Size*GB != size {
 			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("invalid option requested size: %d", size))
 		}
-		glog.Info("volume already created")
+		klog.V(5).Info("volume already created")
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
 				VolumeId:      vol.VolumeId,
@@ -180,7 +180,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		if err != nil {
 			return nil, err
 		}
-		glog.Info(fmt.Sprintf("rand region and zone: %s, %s", region, zone))
+		klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", region, zone))
 	}
 
 	tags, err := parseTags(parameters.Get("tags", ""))
@@ -242,7 +242,7 @@ func (cs *KscEBSControllerServer) delvolume(delVol *ebsClient.Volume, size int64
 			VolumeId: delVol.VolumeId,
 		})
 		if err != nil {
-			glog.Errorf("Error deleting volume on duplicate createvolume, volume id: %s", delVol.VolumeId)
+			klog.Errorf("Error deleting volume on duplicate createvolume, volume id: %s", delVol.VolumeId)
 		}
 		return true
 	}
@@ -259,7 +259,7 @@ func parseTags(p string) (map[string]string, error) {
 	for _, label := range parts {
 		temp := strings.Split(label, "~")
 		if len(temp) != 2 {
-			glog.Warningf("Invalid label: %v; %s", temp, label)
+			klog.Warningf("Invalid label: %v; %s", temp, label)
 			continue
 		}
 		res[temp[0]] = temp[1]
@@ -269,7 +269,7 @@ func parseTags(p string) (map[string]string, error) {
 
 func (cs *KscEBSControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	if err := cs.validateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
-		glog.V(3).Infof("invalid delete volume req: %v", req)
+		klog.V(3).Infof("invalid delete volume req: %v", req)
 		return nil, err
 	}
 
@@ -303,23 +303,23 @@ func (cs *KscEBSControllerServer) ControllerUnpublishVolume(ctx context.Context,
 	ebs, err := cs.ebsClient.GetVolume(listVolumesReq)
 	if err != nil {
 		if err.Error() == "not found volume" {
-			glog.Errorf("volume id: %s error: %v. volume is deleted", req.VolumeId, err)
+			klog.Errorf("volume id: %s error: %v. volume is deleted", req.VolumeId, err)
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
 		}
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	if ebs.VolumeStatus != "in-use" {
-		glog.Infof("volume id: %s, volume status %s. volume is detached ", req.VolumeId, ebs.VolumeStatus)
+		klog.V(5).Infof("volume id: %s, volume status %s. volume is detached ", req.VolumeId, ebs.VolumeStatus)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
 	if len(ebs.Attachments) > 0 {
 		if ebs.Attachments[0].InstanceId != req.NodeId {
-			glog.Infof("volume id: %s, volume status %s, target node id: %s. volume is used by other node: %s.", req.VolumeId, ebs.VolumeStatus, req.NodeId, ebs.Attachments[0].InstanceId)
+			klog.V(5).Infof("volume id: %s, volume status %s, target node id: %s. volume is used by other node: %s.", req.VolumeId, ebs.VolumeStatus, req.NodeId, ebs.Attachments[0].InstanceId)
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
 		}
 	} else {
-		glog.Fatalf("volume id: %s, volume status %s, target node id: %s. volume is not used. please contact ebs", req.VolumeId, ebs.VolumeStatus, req.NodeId)
+		klog.Fatalf("volume id: %s, volume status %s, target node id: %s. volume is not used. please contact ebs", req.VolumeId, ebs.VolumeStatus, req.NodeId)
 	}
 
 	detachVolumeReq := &ebsClient.DetachVolumeReq{
@@ -329,7 +329,7 @@ func (cs *KscEBSControllerServer) ControllerUnpublishVolume(ctx context.Context,
 	if _, err := cs.ebsClient.Detach(detachVolumeReq); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	glog.Info("volume is detached")
+	klog.V(5).Info("volume is detached")
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
@@ -371,7 +371,7 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 	for _, attachment := range vol.Attachments {
 		attachedID = attachment.InstanceId
 		if attachment.InstanceId == req.NodeId {
-			glog.Info("volume is already attached")
+			klog.V(5).Info("volume is already attached")
 			return &csi.ControllerPublishVolumeResponse{
 				PublishContext: map[string]string{
 					"MountPoint": attachment.MountPoint,
@@ -419,7 +419,7 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 	if err := ebsClient.WaitVolumeStatus(cs.ebsClient, req.VolumeId, ebsClient.INUSE_STATUS, req.NodeId); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	glog.Info("volume attached")
+	klog.V(5).Info("volume attached")
 	// 给openapi和cinder异步任务执行时间
 	time.Sleep(5 * time.Second)
 	return &csi.ControllerPublishVolumeResponse{
@@ -525,10 +525,10 @@ func (cs *KscEBSControllerServer) ControllerExpandVolume(ctx context.Context, re
 		var expandVolResp *ebsClient.ExpandVolumeResp
 		var expandVolReq = &ebsClient.ExpandVolumeReq{Size: capacity, OnlineResize: true, VolumeId: volID}
 		if expandVolResp, err = cs.ebsClient.ExpandVolume(expandVolReq); err != nil {
-			glog.Infof("Expand volume-%s failed response: %s , error: %s", volID, expandVolResp, err)
+			klog.V(5).Infof("Expand volume-%s failed response: %s , error: %s", volID, expandVolResp, err)
 			return nil, err
 		} else {
-			glog.Info("volume-%s expanded success.", volID)
+			klog.V(5).Info("volume-%s expanded success.", volID)
 		}
 	}
 

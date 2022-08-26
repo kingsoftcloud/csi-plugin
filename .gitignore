@@ -1,4 +1,6 @@
-.vscode/
+# Vscode files
+.vscode
+
 bin/
 .idea/
 vendor/
