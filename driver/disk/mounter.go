@@ -91,7 +91,7 @@ func (m *mounter) Format(source, fsType string) error {
 		mkfsArgs = []string{"-F", source}
 	}
 
-	klog.V(5).Infof("executing format command, cmd: %v, args: %v", mkfsCmd, mkfsArgs)
+	klog.V(2).Infof("executing format command, cmd: %v, args: %v", mkfsCmd, mkfsArgs)
 	out, err := exec.Command(mkfsCmd, mkfsArgs...).CombinedOutput()
 	if err != nil {
 		//  TODO error:
@@ -163,7 +163,7 @@ func (m *mounter) Mount(source, target, fsType string, opts ...string) error {
 	// }
 	// fileinfo, _ = os.Stat(target)
 	klog.V(5).Infof("source mode: %d", uint32(fileinfo.Mode().Perm()))
-	klog.V(5).Infof("executing mount command, cmd: %v, args: %v", mountCmd, mountArgs)
+	klog.V(2).Infof("executing mount command, cmd: %v, args: %v", mountCmd, mountArgs)
 	//err = syscall.Mount(source, target, fsType, 0, "")
 	out, err := exec.Command(mountCmd, mountArgs...).CombinedOutput()
 	if err != nil {
@@ -197,13 +197,13 @@ func (m *mounter) Unmount(target string) error {
 
 	umountArgs := []string{target}
 
-	klog.V(5).Infof("executing umount command, cmd: %v, args: %v", umountCmd, umountArgs)
+	klog.V(2).Infof("executing umount command, cmd: %v, args: %v", umountCmd, umountArgs)
 	out, err := exec.Command(umountCmd, umountArgs...).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("unmounting failed: %v cmd: '%s %s' output: %q",
 			err, umountCmd, target, string(out))
 	}
-	klog.V(5).Infof("executing umount command result: %s", string(out))
+	klog.V(2).Infof("executing umount command result: %s", string(out))
 	return nil
 }
 
@@ -225,7 +225,7 @@ func (m *mounter) IsFormatted(source string) (bool, error) {
 
 	klog.V(5).Infof("checking if source is formatted, cmd: %v, args: %v", blkidCmd, blkidArgs)
 	out, _ := exec.Command(blkidCmd, blkidArgs...).CombinedOutput()
-	klog.V(5).Infof("exec blkid cmd, return %s.", string(out))
+	klog.V(2).Infof("exec blkid cmd, return %s.", string(out))
 	if strings.TrimSpace(string(out)) == "" {
 		return false, nil
 	}

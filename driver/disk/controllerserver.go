@@ -96,7 +96,7 @@ func (cs *KscEBSControllerServer) validateControllerServiceRequest(c csi.Control
 
 func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	if err := cs.validateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
-		klog.V(3).Infof("invalid create volume req: %v", req)
+		klog.V(2).Infof("invalid create volume req: %v", req)
 		return nil, err
 	}
 	// check parameters
@@ -158,7 +158,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		if vol.Size*GB != size {
 			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("invalid option requested size: %d", size))
 		}
-		klog.V(5).Info("volume already created")
+		klog.V(2).Info("volume already created")
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
 				VolumeId:      vol.VolumeId,
@@ -173,14 +173,15 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	chargeType := parameters.Get("chargetype", defaultChargeType)
 	volumeType := parameters.Get("type", defaultVolumeType)
 	projectId := parameters.Get("projectid", "")
-	region := parameters.Get("region", "")
+	// parameters 不再传递region字段
+	//var region string
 	zone := parameters.Get("zone", "")
-	if region == "" || zone == "" {
-		region, zone, err = cs.k8sClient.GetNodeRegionZone()
+	if len(zone) == 0 {
+		_, zone, err = cs.k8sClient.GetNodeRegionZone()
 		if err != nil {
 			return nil, err
 		}
-		klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", region, zone))
+		klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", zone))
 	}
 
 	tags, err := parseTags(parameters.Get("tags", ""))
@@ -196,7 +197,6 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		ChargeType:       chargeType,
 		VolumeType:       volumeType,
 		ProjectId:        projectId,
-		//Tags:             tags,
 	}
 
 	if len(tags) > 0 {
@@ -223,7 +223,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 			AccessibleTopology: []*csi.Topology{
 				{
 					Segments: map[string]string{
-						util.NodeRegionKey: region,
+						util.NodeRegionKey: zone[:len(zone)-1],
 						util.NodeZoneKey:   zone,
 					},
 				},
@@ -234,7 +234,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	return resp, nil
 }
 
-//delvolume For CreateVolume rpc timeout error
+// delvolume For CreateVolume rpc timeout error
 func (cs *KscEBSControllerServer) delvolume(delVol *ebsClient.Volume, size int64) bool {
 	createTime, _ := time.Parse("2006-01-02 15:04:05", delVol.CreateTime)
 	if delVol.VolumeDesc == createdByDO && delVol.Size == size/GB && time.Since(createTime).Seconds() < 60 {
@@ -269,7 +269,7 @@ func parseTags(p string) (map[string]string, error) {
 
 func (cs *KscEBSControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	if err := cs.validateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
-		klog.V(3).Infof("invalid delete volume req: %v", req)
+		klog.V(2).Infof("invalid delete volume req: %v", req)
 		return nil, err
 	}
 
@@ -309,13 +309,13 @@ func (cs *KscEBSControllerServer) ControllerUnpublishVolume(ctx context.Context,
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 	if ebs.VolumeStatus != "in-use" {
-		klog.V(5).Infof("volume id: %s, volume status %s. volume is detached ", req.VolumeId, ebs.VolumeStatus)
+		klog.V(2).Infof("volume id: %s, volume status %s. volume is detached ", req.VolumeId, ebs.VolumeStatus)
 		return &csi.ControllerUnpublishVolumeResponse{}, nil
 	}
 
 	if len(ebs.Attachments) > 0 {
 		if ebs.Attachments[0].InstanceId != req.NodeId {
-			klog.V(5).Infof("volume id: %s, volume status %s, target node id: %s. volume is used by other node: %s.", req.VolumeId, ebs.VolumeStatus, req.NodeId, ebs.Attachments[0].InstanceId)
+			klog.V(2).Infof("volume id: %s, volume status %s, target node id: %s. volume is used by other node: %s.", req.VolumeId, ebs.VolumeStatus, req.NodeId, ebs.Attachments[0].InstanceId)
 			return &csi.ControllerUnpublishVolumeResponse{}, nil
 		}
 	} else {
@@ -329,7 +329,7 @@ func (cs *KscEBSControllerServer) ControllerUnpublishVolume(ctx context.Context,
 	if _, err := cs.ebsClient.Detach(detachVolumeReq); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	klog.V(5).Info("volume is detached")
+	klog.V(2).Info("volume is detached")
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
@@ -371,7 +371,7 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 	for _, attachment := range vol.Attachments {
 		attachedID = attachment.InstanceId
 		if attachment.InstanceId == req.NodeId {
-			klog.V(5).Info("volume is already attached")
+			klog.V(2).Info("volume is already attached")
 			return &csi.ControllerPublishVolumeResponse{
 				PublishContext: map[string]string{
 					"MountPoint": attachment.MountPoint,
@@ -525,7 +525,7 @@ func (cs *KscEBSControllerServer) ControllerExpandVolume(ctx context.Context, re
 		var expandVolResp *ebsClient.ExpandVolumeResp
 		var expandVolReq = &ebsClient.ExpandVolumeReq{Size: capacity, OnlineResize: true, VolumeId: volID}
 		if expandVolResp, err = cs.ebsClient.ExpandVolume(expandVolReq); err != nil {
-			klog.V(5).Infof("Expand volume-%s failed response: %s , error: %s", volID, expandVolResp, err)
+			klog.V(2).Infof("Expand volume-%s failed response: %s , error: %s", volID, expandVolResp, err)
 			return nil, err
 		} else {
 			klog.V(5).Info("volume-%s expanded success.", volID)

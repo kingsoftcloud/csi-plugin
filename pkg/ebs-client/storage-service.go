@@ -316,9 +316,9 @@ func (va *ValidateAttachInstanceReq) ToQuery() string {
 }
 
 type ValidateAttachInstanceResp struct {
-	RequestId      string `json:"RequestId"`
-	InstanceEnable bool   `json:"InstanceEnable"`
-	// InstanceState  string `json:"InstanceState"`
-	// LargeVolumeSupport bool `json:"LargeVolumeSupport"`
-	// AvailableVolumeNum int `json:"AvailableVolumeNum"`
+	RequestId          string `json:"RequestId"`
+	InstanceEnable     bool   `json:"InstanceEnable"`
+	InstanceState      string `json:"InstanceState"`
+	LargeVolumeSupport bool   `json:"LargeVolumeSupport"`
+	AvailableVolumeNum int    `json:"AvailableVolumeNum"`
 }

@@ -6,8 +6,8 @@ import (
 	ebsClient "csi-plugin/pkg/ebs-client"
 	"flag"
 	"os"
-	"os/signal"
-	"syscall"
+	"strings"
+	"sync"
 	"time"
 
 	api "csi-plugin/pkg/open-api"
@@ -21,9 +21,11 @@ import (
 )
 
 const (
-	EBSdriverName = "com.ksc.csi.diskplugin"
-	NFSDriverName = "com.kce.csi.nfs"
-	version       = "1.6.0"
+	EBSdriverName          = "com.ksc.csi.diskplugin"
+	NFSDriverName          = "com.ksc.csi.nfsplugin"
+	DiskNFSMultiDriverName = "com.ksc.csi.diskplugin,com.ksc.csi.nfsplugin"
+	TypePluginVar          = "com.ksc.csi.driverplugin-replace"
+	version                = "1.7.0"
 )
 
 var (
@@ -45,18 +47,18 @@ var (
 	timeout         = flag.Duration("timeout", 30*time.Second, "Timeout specifies a time limit for requests made by this Client.")
 	//clusterInfoPath = flag.String("cluster-info-path", "/opt/app-agent/arrangement/clusterinfo", "")
 	metric            = flag.Bool("metric", false, "Enable monitoring volume statistics")
-	driverName        = flag.String("driver", EBSdriverName, "CSI Driver")
+	driverName        = flag.String("driver", DiskNFSMultiDriverName, "CSI Driver, support multi driver and  separated by ','")
 	maxVolumesPerNode = flag.Int64("max-volumes-pernode", 8, "Only EBS: maximum number of volumes that can be attached to node")
 	//nfs
 	mountPermissions = flag.Uint64("mount-permissions", 0777, "mounted folder permissions")
 	workingMountDir  = flag.String("working-mount-dir", "/tmp", "working directory for provisioner to mount nfs shares temporarily")
 )
 
-func new_k8sclient() *k8sclient.Clientset {
+func newK8SClient() *k8sclient.Clientset {
 	var config *rest.Config
 	var err error
 	if *master != "" || *kubeconfig != "" {
-		klog.V(5).Infof("Either master or kubeconfig specified. building kube config from that..")
+		klog.V(2).Infof("Either master or kubeconfig specified. building kube config from that..")
 		config, err = clientcmd.BuildConfigFromFlags(*master, *kubeconfig)
 	} else {
 		klog.V(5).Infof("Building kube configs for running in cluster...")
@@ -79,7 +81,7 @@ type ClusterInfo struct {
 	Region    string `json:"region"`
 }
 
-func getEBSDriver() *ebs.Driver {
+func getEBSDriver(epName string) *ebs.Driver {
 	OpenApiConfig := &api.ClientConfig{
 		AccessKeyId:     *accessKeyId,
 		AccessKeySecret: *accessKeySecret,
@@ -90,13 +92,13 @@ func getEBSDriver() *ebs.Driver {
 	}
 
 	cfg := &ebs.Config{
-		EndPoint:               *endpoint,
+		EndPoint:               epName,
 		EnableNodeServer:       *nodeServer,
 		EnableControllerServer: *controllerServer,
 		EnableVolumeExpansion:  *volumeExpansion,
 		MaxVolumeSize:          *maxVolumeSize,
-		DriverName:             *driverName,
-		K8sClient:              new_k8sclient(),
+		DriverName:             EBSdriverName,
+		K8sClient:              newK8SClient(),
 		EbsClient:              ebsClient.New(OpenApiConfig),
 		MetricEnabled:          *metric,
 		Version:                version,
@@ -107,54 +109,74 @@ func getEBSDriver() *ebs.Driver {
 	return ebs.NewDriver(cfg)
 }
 
-func getNFSDriver() *nfs.Driver {
-	nodeID,err:= util.GetSystemUUID()
-	if err !=nil{
-		klog.Warning("nodeid is empty")
+func getNFSDriver(epName string) *nfs.Driver {
+	nodeID, err := util.GetSystemUUID()
+	if err != nil {
+		klog.Warningf("nodeid is empty, err: %v", err)
 	}
 	driverOptions := nfs.DriverOptions{
 		NodeID:           nodeID,
-		DriverName:       *driverName,
-		Endpoint:         *endpoint,
+		DriverName:       NFSDriverName,
+		Endpoint:         epName,
 		MountPermissions: *mountPermissions,
 		WorkingMountDir:  *workingMountDir,
 	}
-	return  nfs.NewDriver(&driverOptions)
+	return nfs.NewDriver(&driverOptions)
 
 }
+
+func replaceEndpoint(driverType, endpointName string) string {
+	return strings.Replace(endpointName, TypePluginVar, driverType, -1)
+}
+
+func init() {
+	flag.Set("logtostderr", "true")
+}
+
 func main() {
+	klog.InitFlags(nil)
 	flag.Parse()
-	klog.V(5).Infof("CSI Driver Name: %s, version: %s, endPoints: %s", *driverName, version, *endpoint)
-
-	util.InitAksk(new_k8sclient())
-	stop := make(chan struct{})
-	switch *driverName {
-	case EBSdriverName:
-		d := getEBSDriver()
-		go func() {
-			if err := d.Run(); err != nil {
-				klog.Fatal(err)
-				d.Stop()
-				stop <- struct{}{}
-			}
-		}()
-	case NFSDriverName:
-		// TODO
-		r := getNFSDriver()
-		r.Run()
-		r.Stop()
-		stop <- struct{}{}
+	klog.Infof("CSI Driver Name: %s, version: %s, endPoints: %s", *driverName, version, *endpoint)
+	util.InitAksk(newK8SClient())
+	multiDriverNames := *driverName
+	driverNames := strings.Split(multiDriverNames, ",")
+	var epName = *endpoint
+	var wg sync.WaitGroup
+	for _, driverName := range driverNames {
+		wg.Add(1)
+		if strings.Contains(*endpoint, TypePluginVar) {
+			epName = replaceEndpoint(driverName, *endpoint)
+		} else {
+			klog.Fatal("csi endpoint: %s", *endpoint)
+		}
+		switch driverName {
+		case EBSdriverName:
+			go func(ep string) {
+				defer wg.Done()
+				d := getEBSDriver(ep)
+				if err := d.Run(); err != nil {
+					klog.Fatal(err)
+					d.Stop()
+				}
+			}(epName)
+		case NFSDriverName:
+			go func(ep string) {
+				defer wg.Done()
+				r := getNFSDriver(ep)
+				r.Run(false)
+			}(epName)
+		default:
+			klog.Fatalf("CSI start failed, not support driver: %s", driverName)
+		}
 	}
-
-	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-		s := <-c
-		klog.V(5).Infof("got system signal: %v, exiting", s)
-		stop <- struct{}{}
-	}()
-
-	<-stop
-	//d.Stop()
-
+	// wg.Add(1)
+	// go func() {
+	// 	c := make(chan os.Signal, 1)
+	// 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	// 	s := <-c
+	// 	klog.Infof("got system signal: %v, exiting", s)
+	// 	wg.Done()
+	// }()
+	wg.Wait()
+	os.Exit(0)
 }

@@ -103,7 +103,7 @@ func (d *Driver) Run() error {
 		csi.RegisterNodeServer(d.srv, d.nodeServer)
 	}
 
-	klog.V(5).Infof("Listening for connections on address: %#v", listener.Addr())
+	klog.V(2).Infof("Listening for connections on address: %#v", listener.Addr())
 	return d.srv.Serve(listener)
 }
 
@@ -112,7 +112,7 @@ func (d *Driver) Stop() {
 	d.ready = false
 	d.readyMu.Unlock()
 
-	klog.V(5).Info("server stopped")
+	klog.V(2).Info("server stopped")
 	d.srv.GracefulStop()
 }
 
@@ -131,14 +131,14 @@ func ParseEndpoint(ep string) (string, string, error) {
 }
 
 func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	fmt.Println()
-	klog.V(3).Infof("GRPC call: %s", info.FullMethod)
-	klog.V(5).Infof("GRPC request: %s", protosanitizer.StripSecretsCSI03(req))
+	level := klog.Level(getLogLevel(info.FullMethod))
+	klog.V(level).Infof("GRPC call: %s", info.FullMethod)
+	klog.V(level).Infof("GRPC request: %s", protosanitizer.StripSecrets(req))
 	resp, err := handler(ctx, req)
 	if err != nil {
 		klog.Errorf("GRPC error: %v", err)
 	} else {
-		klog.V(5).Infof("GRPC response: %s", protosanitizer.StripSecretsCSI03(resp))
+		klog.V(level).Infof("GRPC response: %s", protosanitizer.StripSecrets(resp))
 	}
 	return resp, err
 }

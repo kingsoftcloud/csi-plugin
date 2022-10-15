@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 	mount "k8s.io/mount-utils"
 )
 

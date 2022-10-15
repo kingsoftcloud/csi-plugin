@@ -26,7 +26,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 	mount "k8s.io/mount-utils"
 )
@@ -55,7 +55,7 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if req.GetReadonly() {
 		mountOptions = append(mountOptions, "ro")
 	}
-
+	
 	var server, baseDir, subDir string
 	subDirReplaceMap := map[string]string{}
 

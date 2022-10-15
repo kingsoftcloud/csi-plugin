@@ -122,11 +122,11 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 				return nil, status.Error(codes.Internal, err.Error())
 			}
 		} else {
-			klog.V(5).Info("source device is already formatted")
+			klog.V(2).Info("source device is already formatted")
 		}
 
 	} else {
-		klog.V(5).Info("skipping formatting the source device")
+		klog.V(2).Info("skipping formatting the source device")
 	}
 	klog.V(5).Info("mounting the volume for staging")
 	mounted, err := d.mounter.IsMounted(target)
@@ -138,9 +138,9 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	} else {
-		klog.V(5).Info("source device is already mounted to the target path")
+		klog.V(2).Info("source device is already mounted to the target path")
 	}
-	klog.V(5).Info("formatting and mounting stage volume is finished")
+	klog.V(2).Info("formatting and mounting stage volume is finished")
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
@@ -185,7 +185,7 @@ func (d *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 			return nil, err
 		}
 	} else {
-		klog.V(5).Info("staging target path is already unmounted")
+		klog.V(2).Info("staging target path is already unmounted")
 	}
 
 	klog.V(5).Info("unmounting stage volume is finished")
@@ -238,7 +238,7 @@ func (d *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	} else {
-		klog.V(5).Info("volume is already mounted")
+		klog.V(2).Info("volume is already mounted")
 	}
 
 	klog.V(5).Info("bind mounting the volume is finished")
@@ -267,7 +267,7 @@ func (d *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 			return nil, err
 		}
 	} else {
-		klog.V(5).Info("target path is already unmounted")
+		klog.V(2).Info("target path is already unmounted")
 	}
 
 	klog.V(5).Info("unmounting volume is finished")
@@ -372,10 +372,23 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 		d.zone = node.Labels[util.NodeZoneKey]
 	}
 
+	//TODO 待支持
+	maxVolumesPerNode := d.config.MaxVolumesPerNode
+	// instanceinfo, err := d.config.EbsClient.ValidateAttachInstance(&ebsClient.ValidateAttachInstanceReq{
+	// 	//VolumeType: vol.VolumeType,
+	// 	InstanceId: d.nodeID,
+	// })
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if maxVolumesPerNode < int64(instanceinfo.LargeVolumeSupport) {
+	// 	maxVolumesPerNode = int64(instanceinfo.LargeVolumeSupport)
+	// }
 	resp := &csi.NodeGetInfoResponse{
 		NodeId: d.nodeID,
 		//refer to  https://docs.ksyun.com/documents/5423 "单实例云硬盘数量"
-		MaxVolumesPerNode: d.config.MaxVolumesPerNode,
+
+		MaxVolumesPerNode: maxVolumesPerNode,
 		// make sure that the driver works on this particular region only
 		AccessibleTopology: &csi.Topology{
 			Segments: map[string]string{
@@ -387,53 +400,54 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 	return resp, nil
 }
 
+// // NodeExpandVolume is only implemented so the driver can be used for e2e testing.
 //
-//// NodeExpandVolume is only implemented so the driver can be used for e2e testing.
-//func (d *EnableNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-//	if !hp.config.EnableVolumeExpansion {
-//		return nil, status.Error(codes.Unimplemented, "NodeExpandVolume is not supported")
-//	}
-//
-//	volID := req.GetVolumeId()
-//	if len(volID) == 0 {
-//		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
-//	}
-//
-//	// Lock before acting on global state. A production-quality
-//	// driver might use more fine-grained locking.
-//	hp.mutex.Lock()
-//	defer hp.mutex.Unlock()
-//
-//	vol, err := hp.state.GetVolumeByID(volID)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	volPath := req.GetVolumePath()
-//	if len(volPath) == 0 {
-//		return nil, status.Error(codes.InvalidArgument, "Volume path not provided")
-//	}
-//
-//	info, err := os.Stat(volPath)
-//	if err != nil {
-//		return nil, status.Errorf(codes.InvalidArgument, "Could not get file information from %s: %v", volPath, err)
-//	}
-//
-//	switch m := info.Mode(); {
-//	case m.IsDir():
-//		if vol.VolAccessType != state.MountAccess {
-//			return nil, status.Errorf(codes.InvalidArgument, "Volume %s is not a directory", volID)
+//	func (d *EnableNodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+//		if !hp.config.EnableVolumeExpansion {
+//			return nil, status.Error(codes.Unimplemented, "NodeExpandVolume is not supported")
 //		}
-//	case m&os.ModeDevice != 0:
-//		if vol.VolAccessType != state.BlockAccess {
-//			return nil, status.Errorf(codes.InvalidArgument, "Volume %s is not a block device", volID)
+//
+//		volID := req.GetVolumeId()
+//		if len(volID) == 0 {
+//			return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 //		}
-//	default:
-//		return nil, status.Errorf(codes.InvalidArgument, "Volume %s is invalid", volID)
+//
+//		// Lock before acting on global state. A production-quality
+//		// driver might use more fine-grained locking.
+//		hp.mutex.Lock()
+//		defer hp.mutex.Unlock()
+//
+//		vol, err := hp.state.GetVolumeByID(volID)
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//		volPath := req.GetVolumePath()
+//		if len(volPath) == 0 {
+//			return nil, status.Error(codes.InvalidArgument, "Volume path not provided")
+//		}
+//
+//		info, err := os.Stat(volPath)
+//		if err != nil {
+//			return nil, status.Errorf(codes.InvalidArgument, "Could not get file information from %s: %v", volPath, err)
+//		}
+//
+//		switch m := info.Mode(); {
+//		case m.IsDir():
+//			if vol.VolAccessType != state.MountAccess {
+//				return nil, status.Errorf(codes.InvalidArgument, "Volume %s is not a directory", volID)
+//			}
+//		case m&os.ModeDevice != 0:
+//			if vol.VolAccessType != state.BlockAccess {
+//				return nil, status.Errorf(codes.InvalidArgument, "Volume %s is not a block device", volID)
+//			}
+//		default:
+//			return nil, status.Errorf(codes.InvalidArgument, "Volume %s is invalid", volID)
+//		}
+//
+//		return &csi.NodeExpandVolumeResponse{}, nil
 //	}
 //
-//	return &csi.NodeExpandVolumeResponse{}, nil
-//}
 // getDiskSource returns the absolute path of the attached volume for the given
 // DO volume name
 func getDiskSource(volumeId string) string {

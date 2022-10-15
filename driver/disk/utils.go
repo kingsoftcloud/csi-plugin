@@ -146,3 +146,13 @@ func (sm SuperMapString) Get(key, backup string) string {
 	}
 	return value
 }
+
+func getLogLevel(method string) int32 {
+	if method == "/csi.v1.Identity/Probe" ||
+		method == "/csi.v1.Node/NodeGetCapabilities" ||
+		method == "/csi.v1.Node/NodeGetVolumeStats" || 
+		method=="/csi.v1.Controller/ControllerGetCapabilities"{
+		return 5
+	}
+	return 2
+}
