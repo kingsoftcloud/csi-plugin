@@ -370,7 +370,7 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 	attachedID := ""
 	for _, attachment := range vol.Attachments {
 		attachedID = attachment.InstanceId
-		if attachment.InstanceId == req.NodeId {
+		if attachment.InstanceId == req.NodeId && vol.VolumeStatus == "in-use" {
 			klog.V(2).Info("volume is already attached")
 			return &csi.ControllerPublishVolumeResponse{
 				PublishContext: map[string]string{
