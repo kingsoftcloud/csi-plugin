@@ -22,11 +22,13 @@ func Test_parseTags(t *testing.T) {
 			},
 			want: map[string]string{
 				"dfa":   "daffd",
-				"fdasf": "d12223",
+				"fdasf": "d12223=",
+				"ff":"",
+				
 				// "":"",
 				// "":"",
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {

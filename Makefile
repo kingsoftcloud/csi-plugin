@@ -1,6 +1,6 @@
-#VERSION ?= latest
+
 VERSION ?= 1.7.0-gh-test
-#VERSION ?= xqtest
+
 ARCH ?= amd64
 
 all: clean compile build
@@ -27,7 +27,8 @@ deploy_v0.1.0:
 
 .PHONY: test
 test:
-	go test --cover -v  ./driver
+	# go test --cover  ./driver/disk
+	go test --cover  ./driver/nfs
 
 build-mp-image:
 	manifest-tool --username admin --password UHdkLUZvci1TZWNyZXRhcnktTWlhbwo= \

@@ -17,8 +17,10 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	k8s_v1 "k8s.io/api/core/v1"
+	//k8s_v1 "k8s.io/api/core/v1"
+	
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	k8sclient "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 )
@@ -525,10 +527,10 @@ func (cs *KscEBSControllerServer) ControllerExpandVolume(ctx context.Context, re
 		var expandVolResp *ebsClient.ExpandVolumeResp
 		var expandVolReq = &ebsClient.ExpandVolumeReq{Size: capacity, OnlineResize: true, VolumeId: volID}
 		if expandVolResp, err = cs.ebsClient.ExpandVolume(expandVolReq); err != nil {
-			klog.V(2).Infof("Expand volume-%s failed response: %s , error: %s", volID, expandVolResp, err)
+			klog.V(2).Infof("Expand volume-%s failed response: %v , error: %v", volID, expandVolResp, err)
 			return nil, err
 		} else {
-			klog.V(5).Info("volume-%s expanded success.", volID)
+			klog.V(5).Infof("volume-%s expanded success.", volID)
 		}
 	}
 
@@ -581,23 +583,32 @@ func GetK8sClientWrapper(k8sclient *k8sclient.Clientset) K8sClientWrapper {
 }
 
 func (kc *K8sClientWrap) GetNodeRegionZone() (string, string, error) {
-	var randNodes []k8s_v1.Node
-	//TODO meta_v1.ListOptions 选择不了特定标签
-	nodes, err := kc.k8sclient.CoreV1().Nodes().List(context.Background(), meta_v1.ListOptions{})
+	//var randNodes []k8s_v1.Node
+	//TODO meta_v1.ListOptions 选择node
+	labeSelector:=meta_v1.LabelSelector{
+		MatchLabels: map[string]string{"kubernetes.io/role":"node"},
+	}
+	mapLabel,err:=meta_v1.LabelSelectorAsMap(&labeSelector)
+	if err!=nil{
+		return "","",err
+	}
+	nodes, err := kc.k8sclient.CoreV1().Nodes().List(context.Background(), meta_v1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(mapLabel).String(),
+	})
 	if err != nil {
 		return "", "", err
 	}
 
 	rand.Seed(time.Now().UnixNano())
 	// sc 没有声明region和AZ, 这里只随机选择role为node的可用区
-	for _, v := range nodes.Items {
-		if role, ok := v.Labels[util.NodeRoleKey]; ok {
-			if role == "node" {
-				randNodes = append(randNodes, v)
-			}
-		}
-	}
-	randNode := randNodes[rand.Intn(len(randNodes))]
+	// for _, v := range nodes.Items {
+	// 	if role, ok := v.Labels[util.NodeRoleKey]; ok {
+	// 		if role == "node" {
+	// 			randNodes = append(randNodes, v)
+	// 		}
+	// 	}
+	// }
+	randNode := nodes.Items[rand.Intn(len(nodes.Items))]
 
 	return randNode.Labels[util.NodeRegionKey], randNode.Labels[util.NodeZoneKey], nil
 }
