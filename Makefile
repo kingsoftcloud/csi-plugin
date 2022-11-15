@@ -3,7 +3,7 @@ VERSION ?= 1.7.0-gh-test
 
 ARCH ?= amd64
 
-all: clean compile build
+all: clean compile build push
 
 .PHONY: clean
 clean:

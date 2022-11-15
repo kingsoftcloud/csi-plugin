@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	serviceName = "ebs"
+	serviceName              = "ebs"
+	clientDeleteVolumeStatus = "VolumeCanNotFoundError"
 )
 
 type Client struct {
@@ -59,6 +60,21 @@ func (cli *Client) DeleteVolume(deleteVolumeReq *DeleteVolumeReq) (*DeleteVolume
 	query := deleteVolumeReq.ToQuery()
 	resp, err := cli.DoRequest(serviceName, query)
 	if err != nil {
+		// Compatible with other ways to delete volume
+		type ErrorResponse struct {
+			RequestID string
+			Error     struct {
+				Code    string
+				Message string
+			}
+		}
+		var error_resp ErrorResponse
+		if err = json.Unmarshal(resp, &error_resp); err != nil {
+			klog.Error("JSON unmarshal failed:", err)
+		}
+		if error_resp.Error.Code == clientDeleteVolumeStatus {
+			return deleteVolumeResp, nil
+		}
 		return nil, err
 	}
 
@@ -120,7 +136,7 @@ func (cli *Client) GetVolumeByName(getVolumesReq *ListVolumesReq) (*ListVolumesR
 	return listVolumesResp, nil
 }
 
-//TODO
+// TODO
 func (cli *Client) ExpandVolume(expandVolumeReq *ExpandVolumeReq) (*ExpandVolumeResp, error) {
 	query := expandVolumeReq.ToQuery()
 	resp, err := cli.DoRequest(serviceName, query)
