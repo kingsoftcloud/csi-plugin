@@ -17,8 +17,9 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
 	//k8s_v1 "k8s.io/api/core/v1"
-	
+
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	k8sclient "k8s.io/client-go/kubernetes"
@@ -262,7 +263,8 @@ func parseTags(p string) (map[string]string, error) {
 		temp := strings.Split(label, "~")
 		if len(temp) != 2 {
 			klog.Warningf("Invalid label: %v; %s", temp, label)
-			continue
+			return nil, fmt.Errorf("invalid tag: %s", label)
+			//continue
 		}
 		res[temp[0]] = temp[1]
 	}
@@ -585,12 +587,12 @@ func GetK8sClientWrapper(k8sclient *k8sclient.Clientset) K8sClientWrapper {
 func (kc *K8sClientWrap) GetNodeRegionZone() (string, string, error) {
 	//var randNodes []k8s_v1.Node
 	//TODO meta_v1.ListOptions 选择node
-	labeSelector:=meta_v1.LabelSelector{
-		MatchLabels: map[string]string{"kubernetes.io/role":"node"},
+	labeSelector := meta_v1.LabelSelector{
+		MatchLabels: map[string]string{"kubernetes.io/role": "node"},
 	}
-	mapLabel,err:=meta_v1.LabelSelectorAsMap(&labeSelector)
-	if err!=nil{
-		return "","",err
+	mapLabel, err := meta_v1.LabelSelectorAsMap(&labeSelector)
+	if err != nil {
+		return "", "", err
 	}
 	nodes, err := kc.k8sclient.CoreV1().Nodes().List(context.Background(), meta_v1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(mapLabel).String(),

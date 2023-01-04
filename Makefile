@@ -1,9 +1,11 @@
+#host
+#10.69.69.225 hub-t.kce.ksyun.com
 
-VERSION ?= 1.7.0-gh-test
+VERSION ?= 1.8.0
 
 ARCH ?= amd64
 
-all: clean compile build push
+all: clean compile build tag push
 
 .PHONY: clean
 clean:
@@ -16,9 +18,11 @@ compile:
 
 build: compile
 	docker build -t hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH) -f Dockerfile.$(ARCH) .
-
-push: build
-	docker push hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH)
+tag: build
+	docker tag hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH) hub-t.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH)
+push: tag
+    #docker push hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH)
+	docker push hub-t.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH)
 
 .PHONY: deploy_v0.1.0
 deploy_v0.1.0:
