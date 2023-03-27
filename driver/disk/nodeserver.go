@@ -275,14 +275,28 @@ func (d *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 }
 
 func (d *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	if len(req.VolumeId) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats volume ID was empty")
+	}
+	if len(req.VolumePath) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats volume path was empty")
+	}
+
 	var err error
 	targetPath := req.GetVolumePath()
 	if targetPath == "" {
 		err = fmt.Errorf("NodeGetVolumeStats targetpath %v is empty", targetPath)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-
-	return util.GetMetrics(targetPath)
+	res, err := util.GetMetrics(targetPath)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	res.VolumeCondition = &csi.VolumeCondition{
+		Abnormal: false,
+		Message:  "TODO",
+	}
+	return res, nil
 }
 
 // TODO 目前不支持 xfs 文件系统扩容
@@ -338,6 +352,7 @@ func (d *NodeServer) getNodeServiceCapabilities() []*csi.NodeServiceCapability {
 
 	capabilityRpcTypes = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+		csi.NodeServiceCapability_RPC_VOLUME_CONDITION,
 	}
 	if d.config.EnableVolumeExpansion {
 		capabilityRpcTypes = append(capabilityRpcTypes, csi.NodeServiceCapability_RPC_EXPAND_VOLUME)
@@ -392,6 +407,7 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 		// make sure that the driver works on this particular region only
 		AccessibleTopology: &csi.Topology{
 			Segments: map[string]string{
+				// kubelet patch node resources  .metadata.label Forbiden  "failure-domain.beta.kubernetes.io/region"
 				util.NodeRegionKey: d.region,
 				util.NodeZoneKey:   d.zone,
 			},

@@ -25,7 +25,7 @@ const (
 	NFSDriverName          = "com.ksc.csi.nfsplugin"
 	DiskNFSMultiDriverName = "com.ksc.csi.diskplugin,com.ksc.csi.nfsplugin"
 	TypePluginVar          = "com.ksc.csi.driverplugin-replace"
-	version                = "1.7.0"
+	version                = "1.8.0"
 )
 
 var (

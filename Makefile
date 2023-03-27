@@ -1,5 +1,5 @@
 
-VERSION ?= 1.7.0-gh-test
+VERSION ?= 1.8.0-gh-test
 
 ARCH ?= amd64
 
