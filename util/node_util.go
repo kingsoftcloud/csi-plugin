@@ -80,8 +80,8 @@ func GetPYUUID() (string, error) {
 	if err != nil {
 		// 兼容客户EPC节点无此文件
 		if productuuid, err := ioutil.ReadFile(path.Join(dmiDir, "id", "product_uuid")); err != nil {
-			return "", fmt.Errorf("not found physical system uuid from %s and %s, err: %v", dmiDir,PYFILE,err)
-		}else{
+			return "", fmt.Errorf("not found physical system uuid from %s and %s, err: %v", dmiDir, PYFILE, err)
+		} else {
 			return strings.ToLower(strings.TrimSpace(string(productuuid))), nil
 		}
 	}

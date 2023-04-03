@@ -69,12 +69,12 @@ type Volume struct {
 	VolumeStatus       VolumeStatusType `json:"VolumeStatus"`
 	VolumeType         string           `json:"VolumeType"`
 	VolumeCategory     string           `json:"VolumeCategory"`
-	InstanceId         string           `json:"InstanceId"`
+	InstanceId         string           `json:"InstanceId"` //云硬盘状态为in-use时，该云硬盘关联的实例ID（主机ID）
 	CreateTime         string           `json:"CreateTime"`
 	AvailabilityZone   string           `json:"AvailabilityZone"`
 	ProjectId          int              `json:"ProjectId"`
 	DeleteWithInstance bool             `json:"DeleteWithInstance"`
-	Attachments        []*Attachment    `json:"Attachment"`
+	Attachments        []*Attachment    `json:"Attachment"` //硬盘的当前挂载信息
 }
 
 type Attachment struct {

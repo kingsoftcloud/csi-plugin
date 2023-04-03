@@ -135,7 +135,7 @@ func (m *mounter) Mount(source, target, fsType string, opts ...string) error {
 	mountArgs = append(mountArgs, target)
 
 	// create target, os.Mkdirall is noop if it exists
-	// 0755 保持与kublet 创建目录文件权限一致
+	// 0755 保持与kubelet 创建目录文件权限一致
 	// 0777 暂时兼容非root权限使用csi的fsgroup不生效,导致无法读写的问题
 	err := os.MkdirAll(target, os.FileMode(0755))
 	if err != nil {
@@ -162,7 +162,7 @@ func (m *mounter) Mount(source, target, fsType string, opts ...string) error {
 
 	// }
 	// fileinfo, _ = os.Stat(target)
-	klog.V(5).Infof("source mode: %d", uint32(fileinfo.Mode().Perm()))
+	klog.V(5).Infof("source mode: %d", mode10)
 	klog.V(2).Infof("executing mount command, cmd: %v, args: %v", mountCmd, mountArgs)
 	//err = syscall.Mount(source, target, fsType, 0, "")
 	out, err := exec.Command(mountCmd, mountArgs...).CombinedOutput()
@@ -171,20 +171,21 @@ func (m *mounter) Mount(source, target, fsType string, opts ...string) error {
 			err, mountCmd, strings.Join(mountArgs, " "), string(out))
 	}
 
-	if mode10 < 511 {
-		out, err := exec.Command("chmod", []string{"777", target}...).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("chmod failed: %v cmd: '%s %s' output: %q",
-				err, mountCmd, strings.Join(mountArgs, " "), string(out))
-		}
+	// fsGroup 不生效
+	// if mode10 < 511 {
+	// 	out, err := exec.Command("chmod", []string{"777", target}...).CombinedOutput()
+	// 	if err != nil {
+	// 		return fmt.Errorf("chmod failed: %v cmd: '%s %s' output: %q",
+	// 			err, mountCmd, strings.Join(mountArgs, " "), string(out))
+	// 	}
 
-		out, err = exec.Command("chmod", []string{"g+s", target}...).CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("chmod failed: %v cmd: '%s %s' output: %q",
-				err, mountCmd, strings.Join(mountArgs, " "), string(out))
-		}
+	// 	out, err = exec.Command("chmod", []string{"g+s", target}...).CombinedOutput()
+	// 	if err != nil {
+	// 		return fmt.Errorf("chmod failed: %v cmd: '%s %s' output: %q",
+	// 			err, mountCmd, strings.Join(mountArgs, " "), string(out))
+	// 	}
 
-	}
+	// }
 
 	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
@@ -61,9 +60,9 @@ func getControllerServer(config *Config) *fakeControllerServer {
 	}
 }
 
-func (fc *fakeControllerServer) getNodeReginZone() (string, string, error) {
-	return "test-region", "test-zone", nil
-}
+// func (fc *fakeControllerServer) getNodeReginZone() (string, string, error) {
+// 	return "test-region", "test-zone", nil
+// }
 
 type fakeIdentityServer struct {
 	*IdentityServer
@@ -83,7 +82,9 @@ type fakeK8sClientWrap struct{}
 func (fk *fakeK8sClientWrap) GetNodeRegionZone() (string, string, error) {
 	return "test-region", "test-zone", nil
 }
-
+func (fk *fakeK8sClientWrap) IsNodeStatusReady(nodename string) (bool, error){
+	return false, nil
+}
 func getDriver(t *testing.T) *Driver {
 	if err := os.Remove(socket); err != nil && !os.IsNotExist(err) {
 		t.Fatalf("failed to remove unix domain socket file %s, error: %s", socket, err)
@@ -111,17 +112,13 @@ func TestDriverSuite(t *testing.T) {
 	go d.Run()
 	defer d.Stop()
 
-	mntDir, err := ioutil.TempDir("", "mnt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	mntDir := os.TempDir()
+
 	fmt.Println("mntDir:", mntDir)
 	defer os.RemoveAll(mntDir)
 
-	mntStageDir, err := ioutil.TempDir("", "mnt-stage")
-	if err != nil {
-		t.Fatal(err)
-	}
+	mntStageDir := os.TempDir()
+
 	fmt.Println("mntStageDir:", mntStageDir)
 	defer os.RemoveAll(mntStageDir)
 
@@ -145,7 +142,7 @@ func NewFakeStorageClient() *FakeStorageClient {
 	}
 }
 
-//TODO
+// TODO
 func (cli *FakeStorageClient) ExpandVolume(expandVolumeReq *ebsClient.ExpandVolumeReq) (*ebsClient.ExpandVolumeResp, error) {
 	return nil, nil
 	//listVolumesResp, err := cli.ListVolumes(expandVolumeReq)

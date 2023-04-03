@@ -4,7 +4,6 @@ import (
 	ebsClient "csi-plugin/pkg/ebs-client"
 	"errors"
 	"fmt"
-	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -20,9 +19,6 @@ import (
 
 	//k8s_v1 "k8s.io/api/core/v1"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	k8sclient "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 )
 
@@ -63,7 +59,10 @@ func (cs *KscEBSControllerServer) getControllerServiceCapabilities() []*csi.Cont
 	cl = []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
-		csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
+		//csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
+		csi.ControllerServiceCapability_RPC_GET_VOLUME,
+		csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
+		csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
 	}
 	if cs.config.EnableVolumeExpansion {
 		cl = append(cl, csi.ControllerServiceCapability_RPC_EXPAND_VOLUME)
@@ -385,7 +384,14 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 		}
 	}
 	// node is attached to a different node, return an error
-	if len(attachedID) > 0 {
+	if len(attachedID) > 0 && vol.VolumeStatus == "in-use" {
+		detachVolumeReq := &ebsClient.DetachVolumeReq{
+			VolumeId:   req.VolumeId,
+			InstanceId: vol.InstanceId,
+		}
+		if _, err := cs.ebsClient.Detach(detachVolumeReq); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 		return nil, status.Errorf(codes.FailedPrecondition,
 			"volume is attached to the wrong node(%q), dettach the volume to fix it", attachedID)
 	}
@@ -425,7 +431,7 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 	}
 	klog.V(5).Info("volume attached")
 	// 给openapi和cinder异步任务执行时间
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 	return &csi.ControllerPublishVolumeResponse{
 		PublishContext: map[string]string{
 			//publishInfoVolumeName: vol.VolumeName,
@@ -567,50 +573,50 @@ func (cs *KscEBSControllerServer) ListSnapshots(ctx context.Context, req *csi.Li
 }
 
 func (cs *KscEBSControllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	//return nil, status.Error(codes.Unimplemented, "")
+	if req.VolumeId == "" {
+		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Volume ID must be provided")
+	}
+
+	listVolumesReq := &ebsClient.ListVolumesReq{
+		VolumeIds: []string{req.VolumeId},
+	}
+	vol, err := cs.ebsClient.GetVolume(listVolumesReq)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, err.Error())
+	}
+	if vol.VolumeStatus == "error" {
+		return &csi.ControllerGetVolumeResponse{Status: &csi.ControllerGetVolumeResponse_VolumeStatus{VolumeCondition: &csi.VolumeCondition{Abnormal: false, Message: "ebs volume status error"}}}, nil
+	}
+	if vol.VolumeStatus != "in-use" {
+		klog.V(5).Info("volume is already attached")
+		return &csi.ControllerGetVolumeResponse{}, nil
+	}
+
+	res := &csi.ControllerGetVolumeResponse{
+		Volume: &csi.Volume{
+			VolumeId:      vol.VolumeId,
+			CapacityBytes: int64(vol.Size * GB),
+		},
+		Status: &csi.ControllerGetVolumeResponse_VolumeStatus{
+			PublishedNodeIds: []string{vol.InstanceId},
+			VolumeCondition:  &csi.VolumeCondition{},
+		},
+	}
+
+	nodeReady, err := cs.k8sClient.IsNodeStatusReady(vol.InstanceId)
+	if err != nil {
+		return nil, err
+	}
+	res.Status.VolumeCondition.Abnormal = !nodeReady
+	if !nodeReady {
+		res.Status.VolumeCondition.Message = "node notready: " + vol.InstanceId
+	}
+
+	return res, nil
 }
 
 type K8sClientWrapper interface {
 	GetNodeRegionZone() (string, string, error)
-}
-
-type K8sClientWrap struct {
-	k8sclient *k8sclient.Clientset
-}
-
-func GetK8sClientWrapper(k8sclient *k8sclient.Clientset) K8sClientWrapper {
-	return &K8sClientWrap{
-		k8sclient: k8sclient,
-	}
-}
-
-func (kc *K8sClientWrap) GetNodeRegionZone() (string, string, error) {
-	//var randNodes []k8s_v1.Node
-	//TODO meta_v1.ListOptions 选择node
-	labeSelector := meta_v1.LabelSelector{
-		MatchLabels: map[string]string{"kubernetes.io/role": "node"},
-	}
-	mapLabel, err := meta_v1.LabelSelectorAsMap(&labeSelector)
-	if err != nil {
-		return "", "", err
-	}
-	nodes, err := kc.k8sclient.CoreV1().Nodes().List(context.Background(), meta_v1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(mapLabel).String(),
-	})
-	if err != nil {
-		return "", "", err
-	}
-
-	rand.Seed(time.Now().UnixNano())
-	// sc 没有声明region和AZ, 这里只随机选择role为node的可用区
-	// for _, v := range nodes.Items {
-	// 	if role, ok := v.Labels[util.NodeRoleKey]; ok {
-	// 		if role == "node" {
-	// 			randNodes = append(randNodes, v)
-	// 		}
-	// 	}
-	// }
-	randNode := nodes.Items[rand.Intn(len(nodes.Items))]
-
-	return randNode.Labels[util.NodeRegionKey], randNode.Labels[util.NodeZoneKey], nil
+	IsNodeStatusReady(nodename string) (bool, error)
 }

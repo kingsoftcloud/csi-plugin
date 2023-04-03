@@ -1,18 +1,12 @@
-FROM hub.kce.ksyun.com/tekton/alpine-ca-certificates
-#FROM hub.kce.ksyun.com/tekton/amd64/alpine:3.10.3
-#FROM hub.kce.ksyun.com/tekton/alpine:3.9
+FROM hub.kce.ksyun.com/ksyun/centos
 
 LABEL maintainers="gaohong1@kingsoft.com"
 
-#RUN sed -i 's/http\:\/\/dl-cdn.alpinelinux.org/https\:\/\/mirrors.ustc.edu.cn/g' /etc/apk/repositories
-RUN sed -i 's/http\:\/\/dl-cdn.alpinelinux.org/https\:\/\/mirrors.aliyun.com/g' /etc/apk/repositories
+RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && \
+    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
 
-RUN apk update && apk upgrade && \
-    apk add e2fsprogs-extra &&\
-    apk add e2fsprogs && apk add blkid && apk add findmnt && \
-    apk -U add ca-certificates && \
-    #apk add cloud-utils-growpart && \  
-    update-ca-certificates
+RUN  yum install xfsprogs e2fsprogs -y 
+
 COPY bin/csi-diskplugin /csi-diskplugin
 
 ENTRYPOINT ["/csi-diskplugin"]
