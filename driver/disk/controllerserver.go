@@ -119,11 +119,14 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	}
 
 	volumeName := req.Name
+
+	// 给 ebs 创建硬盘的时间
+	time.Sleep(5 * time.Second)
+
 	// get volume first, if it's created do no thing
 	listVolumesResp, err := cs.ebsClient.GetVolumeByName(&ebsClient.ListVolumesReq{
 		VolumeExactName: volumeName,
 		VolumeCategory:  "data",
-		VolumeStatus:    "available",
 	})
 	if err != nil {
 		return nil, err
@@ -131,7 +134,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 
 	// volume already exist, do nothing
 	if listVolumesResp.TotalCount > 0 && len(listVolumesResp.Volumes) > 0 {
-
+		klog.V(2).Infoln("Query the hard disk list volume already exists")
 		if listVolumesResp.TotalCount > 1 {
 			// external-provisioner 调用了三次 rpc createvolume
 			// 目前解决办法是，需要用户手动去控制台删除一块ebs盘
@@ -157,16 +160,18 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 			}
 		}
 		vol := listVolumesResp.Volumes[0]
-		if vol.Size*GB != size {
-			return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("invalid option requested size: %d", size))
+		if vol.VolumeStatus == "creating" || vol.VolumeStatus == "available" {
+			if vol.Size*GB != size {
+				return nil, status.Error(codes.AlreadyExists, fmt.Sprintf("invalid option requested size: %d", size))
+			}
+			klog.V(2).Info("volume already created")
+			return &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId:      vol.VolumeId,
+					CapacityBytes: size,
+				},
+			}, nil
 		}
-		klog.V(2).Info("volume already created")
-		return &csi.CreateVolumeResponse{
-			Volume: &csi.Volume{
-				VolumeId:      vol.VolumeId,
-				CapacityBytes: size,
-			},
-		}, nil
 	}
 	// todo
 	// checking volume limit
@@ -262,8 +267,8 @@ func parseTags(p string) (map[string]string, error) {
 		temp := strings.Split(label, "~")
 		if len(temp) != 2 {
 			klog.Warningf("Invalid label: %v; %s", temp, label)
-			return nil, fmt.Errorf("invalid tag: %s", label)
-			//continue
+			//return nil, fmt.Errorf("invalid tag: %s", label)
+			continue
 		}
 		res[temp[0]] = temp[1]
 	}
@@ -431,7 +436,7 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 	}
 	klog.V(5).Info("volume attached")
 	// 给openapi和cinder异步任务执行时间
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 	return &csi.ControllerPublishVolumeResponse{
 		PublishContext: map[string]string{
 			//publishInfoVolumeName: vol.VolumeName,
