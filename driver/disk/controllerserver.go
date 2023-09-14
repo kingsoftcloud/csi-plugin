@@ -184,11 +184,16 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	//var region string
 	zone := parameters.Get("zone", "")
 	if len(zone) == 0 {
-		_, zone, err = cs.k8sClient.GetNodeRegionZone()
-		if err != nil {
-			return nil, err
+		if len(req.AccessibilityRequirements.Preferred) == 1 {
+			segments := req.AccessibilityRequirements.Preferred[0]
+			zone = segments.Segments["failure-domain.beta.kubernetes.io/zone"]
+		} else {
+			_, zone, err = cs.k8sClient.GetNodeRegionZone()
+			if err != nil {
+				return nil, err
+			}
+			klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", zone))
 		}
-		klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", zone))
 	}
 
 	tags, err := parseTags(parameters.Get("tags", ""))
