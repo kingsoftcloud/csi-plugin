@@ -183,17 +183,20 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	// parameters 不再传递region字段
 	//var region string
 	zone := parameters.Get("zone", "")
+	zoneSelection := true
 	if len(zone) == 0 {
+		zoneSelection = false
 		if len(req.AccessibilityRequirements.Preferred) == 1 {
 			segments := req.AccessibilityRequirements.Preferred[0]
 			zone = segments.Segments["failure-domain.beta.kubernetes.io/zone"]
-		} else {
-			_, zone, err = cs.k8sClient.GetNodeRegionZone()
-			if err != nil {
-				return nil, err
-			}
-			klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", zone))
 		}
+		//else {
+		//	_, zone, err = cs.k8sClient.GetNodeRegionZone()
+		//	if err != nil {
+		//		return nil, err
+		//	}
+		//	klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", zone))
+		//}
 	}
 
 	tags, err := parseTags(parameters.Get("tags", ""))
@@ -222,15 +225,33 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	if purchaseTime != 0 {
 		createVolumeReq.PurchaseTime = purchaseTime
 	}
-
-	createVolumeResp, err := cs.ebsClient.CreateVolume(createVolumeReq)
-	if err != nil {
-		return nil, err
+	volumeID := ""
+	for i := 0; i < len(req.AccessibilityRequirements.Preferred); i++ {
+		if !zoneSelection {
+			segments := req.AccessibilityRequirements.Preferred[i]
+			createVolumeReq.AvailabilityZone = segments.Segments[util.NodeZoneKey]
+			zone = createVolumeReq.AvailabilityZone
+		}
+		createVolumeResp, err := cs.ebsClient.CreateVolume(createVolumeReq)
+		// if createVolume success
+		if err == nil {
+			volumeID = createVolumeResp.VolumeId
+			break
+		}
+		//if createVolume err and zonezoneSelection or lastpreffer
+		if (err != nil && zoneSelection) || (err != nil && i == len(req.AccessibilityRequirements.Preferred)-1) {
+			return nil, err
+		}
+		continue
 	}
+
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
-			VolumeId:      createVolumeResp.VolumeId,
+			VolumeId:      volumeID,
 			CapacityBytes: size,
 			AccessibleTopology: []*csi.Topology{
 				{
