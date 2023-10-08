@@ -187,8 +187,9 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	if len(zone) == 0 {
 		zoneSelection = false
 		if len(req.AccessibilityRequirements.Preferred) != 0 {
+			// choose the most preffer zone
 			segments := req.AccessibilityRequirements.Preferred[0]
-			zone = segments.Segments["failure-domain.beta.kubernetes.io/zone"]
+			zone = segments.Segments[util.NodeZoneKey]
 		} else {
 			_, zone, err = cs.k8sClient.GetNodeRegionZone()
 			if err != nil {
@@ -237,7 +238,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 			volumeID = createVolumeResp.VolumeId
 			break
 		}
-		//if createVolume err and zonezoneSelection or lastpreffer
+		//if createVolume err and zoneSelection or lastpreffer
 		if (err != nil && zoneSelection) || (err != nil && i == len(req.AccessibilityRequirements.Preferred)-1) {
 			return nil, err
 		}

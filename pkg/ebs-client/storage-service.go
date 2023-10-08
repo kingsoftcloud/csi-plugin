@@ -23,7 +23,7 @@ type StorageService interface {
 
 type VolumeStatusType string
 
-var VolumeTypes = []string{SSD2_0, SSD3_0, SATA3_0, EHDD, "ESSD_PL1", "ESSD_PL2", "ESSD_PL3"}
+var VolumeTypes = []string{SSD2_0, SSD3_0, SATA3_0, EHDD, "ESSD_PL0", "ESSD_PL1", "ESSD_PL2", "ESSD_PL3"}
 
 const (
 	Separator = "&"
@@ -34,7 +34,7 @@ const (
 	SATA3_0 string = "SATA3.0"
 	EHDD    string = "EHDD"
 
-	VolumeTypesRegexp = "^(SSD2.0|SSD3.0|SATA3.0|ESSD_PL1|ESSD_PL2|ESSD_PL3|EHDD)$"
+	VolumeTypesRegexp = "^(SSD2.0|SSD3.0|SATA3.0|ESSD_PL0|ESSD_PL1|ESSD_PL2|ESSD_PL3|EHDD)$"
 
 	// volume size
 	// 单位 GB
