@@ -238,7 +238,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 			volumeID = createVolumeResp.VolumeId
 			break
 		}
-		//if createVolume err and zoneSelection or lastpreffer
+		// if createVolume err and zoneSelection or last preffered
 		if (err != nil && isZoneSpecified) || (err != nil && i == len(req.AccessibilityRequirements.Preferred)-1) {
 			return nil, err
 		}
