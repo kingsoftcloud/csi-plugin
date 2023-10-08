@@ -183,9 +183,9 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	// parameters 不再传递region字段
 	//var region string
 	zone := parameters.Get("zone", "")
-	zoneSelection := true
+	isZoneSpecified := true
 	if len(zone) == 0 {
-		zoneSelection = false
+		isZoneSpecified = false
 		if len(req.AccessibilityRequirements.Preferred) != 0 {
 			// choose the most preffer zone
 			segments := req.AccessibilityRequirements.Preferred[0]
@@ -227,7 +227,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	}
 	volumeID := ""
 	for i := 0; i < len(req.AccessibilityRequirements.Preferred); i++ {
-		if !zoneSelection {
+		if !isZoneSpecified {
 			segments := req.AccessibilityRequirements.Preferred[i]
 			createVolumeReq.AvailabilityZone = segments.Segments[util.NodeZoneKey]
 			zone = createVolumeReq.AvailabilityZone
@@ -239,15 +239,10 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 			break
 		}
 		//if createVolume err and zoneSelection or lastpreffer
-		if (err != nil && zoneSelection) || (err != nil && i == len(req.AccessibilityRequirements.Preferred)-1) {
+		if (err != nil && isZoneSpecified) || (err != nil && i == len(req.AccessibilityRequirements.Preferred)-1) {
 			return nil, err
 		}
-		continue
 	}
-
-	//if err != nil {
-	//	return nil, err
-	//}
 
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
