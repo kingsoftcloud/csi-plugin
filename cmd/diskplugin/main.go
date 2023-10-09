@@ -20,6 +20,10 @@ import (
 	"k8s.io/klog"
 )
 
+//func init() {
+//	flag.Set("logtostderr", "true")
+//}
+
 const (
 	EBSdriverName          = "com.ksc.csi.diskplugin"
 	NFSDriverName          = "com.ksc.csi.nfsplugin"
@@ -106,6 +110,9 @@ func getEBSDriver(epName string) *ebs.Driver {
 	}
 	klog.V(5).Infof("disk driver config: %+v", cfg)
 
+	ebs.GlobalConfigVar.K8sClient = newK8SClient()
+	klog.V(5).Infof("GlobalConfigVar driver config: %+v", ebs.GlobalConfigVar.K8sClient)
+
 	return ebs.NewDriver(cfg)
 }
 
@@ -129,12 +136,9 @@ func replaceEndpoint(driverType, endpointName string) string {
 	return strings.Replace(endpointName, TypePluginVar, driverType, -1)
 }
 
-func init() {
-	flag.Set("logtostderr", "true")
-}
-
 func main() {
 	klog.InitFlags(nil)
+	flag.Set("logtostderr", "true")
 	flag.Parse()
 	klog.Infof("CSI Driver Name: %s, version: %s, endPoints: %s", *driverName, version, *endpoint)
 	util.InitAksk(newK8SClient())

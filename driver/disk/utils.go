@@ -2,7 +2,12 @@ package driver
 
 import (
 	"csi-plugin/util"
+	"encoding/json"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -38,6 +43,15 @@ const (
 	// defaultVolumeSizeInBytes is used when the user did not provide a size or
 	// the size they provided did not satisfy our requirements
 	defaultVolumeSizeInBytes int64 = 16 * GB
+)
+
+var (
+	AvailableVolumeTypes  = []string{SSD2_0, SSD3_0, SATA3_0, EHDD, ESSD, "ESSD_PL1", "ESSD_PL2", "ESSD_PL3"}
+	CustomDiskTypes       = map[string]int{ESSD: 0, SSD3_0: 1, SSD2_0: 2, SATA3_0: 3, EHDD: 4}
+	CustomDiskPerfermance = map[string]string{DISK_PERFORMANCE_LEVEL0: "", DISK_PERFORMANCE_LEVEL1: "", DISK_PERFORMANCE_LEVEL2: "", DISK_PERFORMANCE_LEVEL3: ""}
+
+	// the map of multizone and index
+	storageClassZonePos = map[string]int{}
 )
 
 func validateCapabilities(caps []*csi.VolumeCapability) bool {
@@ -249,4 +263,188 @@ func (kc *K8sClientWrap) IsNodeStatusReady(nodeID string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// getDiskVolumeOptions
+func getDiskVolumeOptions(req *csi.CreateVolumeRequest) (*diskVolumeArgs, error) {
+	//var ok bool
+	diskVolArgs := &diskVolumeArgs{
+		DiskTags: map[string]string{},
+	}
+	volOptions := req.GetParameters()
+
+	//TODO: 获取AZ
+	//zone := parameters.Get("zone", "")
+	//if diskVolArgs.Zone, ok = volOptions["zone"]; !ok {
+	//	if diskVolArgs.Zone, ok = volOptions[strings.ToLower("zone")]; !ok {
+	//		// 选择Zone
+	//		diskVolArgs.Zone = pickZone(req.GetAccessibilityRequirements())
+	//		if diskVolArgs.Zone == "" {
+	//			klog.Errorf("CreateVolume: Can't get topology info , please check your setup or set zone in storage class. Use zone from service: %s", req.Name)
+	//			diskVolArgs.Zone, _ = utils.Get
+	//		}
+	//	}
+	//}
+
+	//TODO: Support Multi zones if set
+	//zoneStr := diskVolArgs.Zone
+	//zones := strings.Split(zoneStr, ",")
+	//zoneNum := len(zones)
+	//if zoneNum > 1 {
+	//	if _, ok := storageClassZonePos[zoneStr]; !ok {
+	//		storageClassZonePos[zoneStr] = 0
+	//	}
+	//	zoneIndex := storageClassZonePos[zoneStr] % zoneNum
+	//	diskVolArgs.Zone = zones[zoneIndex]
+	//	storageClassZonePos[zoneStr]++
+	//}
+	//diskVolArgs.Region, ok = volOptions["region"]
+	//if !ok {
+	//	diskVolArgs.Region = GlobalConfigVar.Region
+	//}
+
+	diskVolArgs.NodeSelected, _ = volOptions[NodeSchedueTag]
+
+	// disk Type
+	diskType, err := validateDiskType(volOptions)
+	if err != nil {
+		return nil, fmt.Errorf("Illegal required parameter type: " + diskVolArgs.Type)
+	}
+	diskVolArgs.Type = diskType
+	pls, err := validateDiskPerformaceLevel(volOptions)
+	if err != nil {
+		return nil, err
+	}
+	diskVolArgs.PerformanceLevel = pls
+
+	// diskTags
+	diskTags, ok := volOptions["tags"]
+	if ok {
+		for _, tag := range strings.Split(diskTags, ",") {
+			k, v, found := strings.Cut(tag, ":")
+			if !found {
+				return nil, status.Errorf(codes.InvalidArgument, "Invalid diskTags format name: %s tags: %s", req.GetName(), diskTags)
+			}
+			diskVolArgs.DiskTags[k] = v
+		}
+	}
+	//TODO: 将PV信息作为diskTags
+
+	return diskVolArgs, nil
+}
+
+func validateDiskType(opts map[string]string) (diskType string, err error) {
+
+	if strings.Contains(opts["type"], ",") {
+		orderedList := []string{}
+		for _, cusType := range strings.Split(opts["type"], ",") {
+			if _, ok := CustomDiskTypes[cusType]; ok {
+				orderedList = append(orderedList, cusType)
+			} else {
+				return diskType, fmt.Errorf("Illegal required parameter type: " + cusType)
+			}
+		}
+		diskType = strings.Join(orderedList, ",")
+		return
+	}
+	for _, t := range AvailableVolumeTypes {
+		if opts["type"] == t {
+			diskType = t
+		}
+	}
+	if diskType == "" {
+		return diskType, fmt.Errorf("Illegal required parameter type: " + opts["type"])
+	}
+	return
+}
+
+func validateDiskPerformaceLevel(opts map[string]string) (performaceLevel string, err error) {
+	pl, ok := opts[ESSD_PERFORMANCE_LEVEL]
+	if !ok || pl == "" {
+		return "", nil
+	}
+	klog.Infof("validateDiskPerformaceLevel: pl: %v", pl)
+	if strings.Contains(pl, ",") {
+		for _, cusPer := range strings.Split(pl, ",") {
+			if _, ok := CustomDiskPerfermance[cusPer]; !ok {
+				return "", fmt.Errorf("illegal performace level type: %s", cusPer)
+			}
+		}
+	}
+	return pl, nil
+}
+
+func volumeCreate(diskType string, volumeId string, size int64, volumeContext map[string]string, zone string) *csi.Volume {
+	accessibleTopology := []*csi.Topology{
+		{
+			Segments: map[string]string{
+				util.NodeRegionKey:                      zone[:len(zone)-1],
+				util.NodeZoneKey:                        zone,
+				fmt.Sprintf(nodeStorageLabel, diskType): "available",
+			},
+		},
+	}
+	if diskType != "" {
+		//Add PV Label
+		diskTypePL := diskType
+		if diskType == ESSD {
+			if pl, ok := volumeContext[ESSD_PERFORMANCE_LEVEL]; ok && pl != "" {
+				diskTypePL = fmt.Sprintf("%s,%s", ESSD, pl)
+			} else {
+				diskTypePL = fmt.Sprintf("%s.%s", ESSD, "PL1")
+			}
+		}
+		volumeContext[labelAppendPrefix+labelVolumeType] = diskTypePL
+
+		// Add PV NodeAffinity
+		labelKey := fmt.Sprintf(nodeStorageLabel, diskType)
+		expressions := []v1.NodeSelectorRequirement{{
+			Key:      labelKey,
+			Operator: v1.NodeSelectorOpIn,
+			Values:   []string{"available"},
+		}}
+		terms := []v1.NodeSelectorTerm{{
+			MatchExpressions: expressions,
+		}}
+		diskTypeTopo := &v1.NodeSelector{
+			NodeSelectorTerms: terms,
+		}
+		diskTypeTopoBytes, _ := json.Marshal(diskTypeTopo)
+		volumeContext[annAppendPrefix+annVolumeTopoKey] = string(diskTypeTopoBytes)
+	}
+
+	klog.V(5).Infof("volumeCreate: volumeContext: %+v", volumeContext)
+	tmpVol := &csi.Volume{
+		CapacityBytes:      size,
+		VolumeId:           volumeId,
+		VolumeContext:      volumeContext,
+		AccessibleTopology: accessibleTopology,
+	}
+
+	return tmpVol
+}
+
+func deleteEmpty(s []string) []string {
+	var a []string
+	for _, str := range s {
+		if str != "" {
+			a = append(a, str)
+		}
+	}
+	return a
+}
+
+func intersect(slice1, slice2 []string) []string {
+	m := make(map[string]int)
+	nn := make([]string, 0)
+	for _, v := range slice1 {
+		m[v]++
+	}
+	for _, v := range slice2 {
+		times, _ := m[v]
+		if times == 1 {
+			nn = append(nn, v)
+		}
+	}
+	return nn
 }

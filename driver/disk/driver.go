@@ -44,6 +44,15 @@ type Config struct {
 	MaxVolumesPerNode      int64
 }
 
+// GlobalConfig save global values for plugin
+type GlobalConfig struct {
+	K8sClient *k8sclient.Clientset
+}
+
+var (
+	GlobalConfigVar GlobalConfig
+)
+
 func NewDriver(config *Config) *Driver {
 	if config.DriverName == "" {
 		klog.Errorf("Driver name missing")
