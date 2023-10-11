@@ -1,7 +1,7 @@
 package driver
 
 import (
-	pkg "csi-plugin/pkg/open-api"
+	OpenApi "csi-plugin/pkg/open-api"
 	"csi-plugin/util"
 	"encoding/json"
 	"errors"
@@ -59,6 +59,35 @@ var (
 	// the map of multizone and index
 	storageClassZonePos = map[string]int{}
 )
+
+type AccountAllProjectListResp struct {
+	ListProjectResult ListProjectResult `json:"ListProjectResult,omitempty"`
+	RequestID         string            `json:"RequestId,omitempty"`
+}
+type ProjectList struct {
+	ProjectID int    `json:"ProjectId,omitempty"`
+	Status    int    `json:"Status,omitempty"`
+	Krn       string `json:"Krn,omitempty"`
+	AccountID string `json:"AccountId,omitempty"`
+}
+type ListProjectResult struct {
+	Total       int           `json:"Total,omitempty"`
+	ProjectList []ProjectList `json:"ProjectList,omitempty"`
+}
+
+type DescribeInstancesResp struct {
+	Marker        int            `json:"Marker,omitempty"`
+	InstanceCount int            `json:"InstanceCount,omitempty"`
+	RequestID     string         `json:"RequestId,omitempty"`
+	InstancesSet  []InstancesSet `json:"InstancesSet,omitempty"`
+}
+type InstanceState struct {
+	Name string `json:"Name,omitempty"`
+}
+type InstancesSet struct {
+	InstanceType  string        `json:"InstanceType,omitempty"`
+	InstanceState InstanceState `json:"InstanceState,omitempty"`
+}
 
 type DescribeInstanceTypeConfigsResp struct {
 	RequestID             string                  `json:"RequestId,omitempty"`
@@ -487,7 +516,11 @@ func UpdateNode(nodes core_v1.NodeInterface) {
 	//zone := nodeInfo.Labels[NodeZoneKey]
 
 	if instanceType == "" {
-		instanceType = nodeInfo.Labels[KceLabelZoneKey]
+		instanceType, err = GetInstanceType(nodeInfo.Annotations[InstanceUuid])
+		if err != nil {
+			return
+		}
+		//instanceType = nodeInfo.Labels[KceLabelZoneKey]
 		//zone = nodeInfo.Labels[KecLabelZoneKey]
 	}
 
@@ -546,8 +579,61 @@ func UpdateNode(nodes core_v1.NodeInterface) {
 	klog.V(5).Infof("UpdateNode:: finished")
 }
 
+func GetProjectId() (ProjectId []int, err error) {
+	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
+	AccountAllProjectListResp := &AccountAllProjectListResp{}
+
+	resp, err := cli.DoRequest("iam", "Action=GetAccountAllProjectList", "")
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(resp, &AccountAllProjectListResp)
+	if err != nil {
+		klog.Error("Error decoding json: ", err)
+		return nil, err
+	}
+	ListProjectResult := AccountAllProjectListResp.ListProjectResult
+	ProjectList := ListProjectResult.ProjectList
+
+	for _, Project := range ProjectList {
+		ProjectId = append(ProjectId, Project.ProjectID)
+	}
+
+	return ProjectId, nil
+}
+
+func GetInstanceType(InstanceId string) (InstanceType string, err error) {
+	ProjectIds, err := GetProjectId()
+	if err != nil {
+		return "", err
+	}
+
+	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
+	DescribeInstancesResp := &DescribeInstancesResp{}
+	payload := fmt.Sprintf("InstanceId.1=%s", InstanceId)
+	for n, ProjectId := range ProjectIds {
+		payload = payload + fmt.Sprintf("&ProjectId.%v=%v", n, ProjectId)
+	}
+
+	resp, err := cli.DoRequest("kec", "Action=DescribeInstances", payload)
+	if err != nil {
+		return "", err
+	}
+
+	err = json.Unmarshal(resp, &DescribeInstancesResp)
+	if err != nil {
+		klog.Error("Error decoding json: ", err)
+		return "", err
+	}
+	InstancesSet := DescribeInstancesResp.InstancesSet
+	InstanceType = InstancesSet[0].InstanceType
+
+	return InstanceType, nil
+}
+
 func GetAvailableDiskTypes(instanceType string) (DataDiskTypes []string, err error) {
-	cli := pkg.New(GlobalConfigVar.OpenApiConfig)
+	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
 	DescribeInstanceTypeConfigsResp := &DescribeInstanceTypeConfigsResp{}
 	payloads := fmt.Sprintf("Filter.1.Name.1=instance-type&Filter.1.Value.1=%s", instanceType)
 

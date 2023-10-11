@@ -115,7 +115,12 @@ func (cli *Client) DoRequest(service string, query string, payloads ...string) (
 		cli.region = aksk.Region
 	}
 	s := v4.Signer{Credentials: credentials.NewStaticCredentials(ak, sk, "")}
-	query = fmt.Sprintf("%v&Version=%v", query, Version)
+
+	if service == "ebs" || service == "kec" {
+		query = fmt.Sprintf("%v&Version=%v", query, Version)
+	} else if service == "iam" {
+		query = fmt.Sprintf("%v&Version=%v", query, "2015-11-01")
+	}
 
 	var payload string
 	if len(payloads) == 0 {

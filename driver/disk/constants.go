@@ -47,4 +47,6 @@ const (
 	KceInstanceTypeLabel = "kce/machine-model"
 	// KceLabel zone ....
 	KceLabelZoneKey = "kce/kec-zone"
+
+	InstanceUuid = "appengine.sdns.ksyun.com/instance-uuid"
 )

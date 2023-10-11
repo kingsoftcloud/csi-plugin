@@ -203,10 +203,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	// checking volume limit
 	// 是否检查每个账号可以创建的最多 volume 数量
 	parameters := SuperMapString(req.Parameters)
-	//chargeType := parameters.Get("chargetype", defaultChargeType)
-	//volumeType := parameters.Get("type", defaultVolumeType)
-	//projectId := parameters.Get("projectid", "")
-	// parameters 不再传递region字段
+
 	//var region string
 	zone := parameters.Get("zone", "")
 	if len(zone) == 0 {
@@ -217,25 +214,6 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", zone))
 	}
 	diskVol.Zone = zone
-
-	//tags, err := parseTags(parameters.Get("tags", ""))
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	//createVolumeReq = &ebsClient.CreateVolumeReq{
-	//	AvailabilityZone: zone,
-	//	VolumeName:       volumeName,
-	//	VolumeDesc:       createdByDO,
-	//	Size:             size / GB,
-	//	ChargeType:       chargeType,
-	//	VolumeType:       volumeType,
-	//	ProjectId:        projectId,
-	//}
-
-	//if len(tags) > 0 {
-	//	createVolumeReq.Tags = tags
-	//}
 
 	createVolumeReq, diskType, err := createDisk(req.GetName(), size, diskVol, parameters)
 
@@ -254,9 +232,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	if diskType != "" {
 		volumeContext["type"] = diskType
 	}
-	klog.V(5).Infof("CreateVolume: volume: %s created diskpl: %s", req.GetName())
-
-	klog.V(5).Infof("createVolumeReq.Size is %v", createVolumeReq.Size)
+	klog.V(5).Infof("CreateVolume: volume: %s", req.GetName())
 
 	createVolumeResp, err := cs.ebsClient.CreateVolume(createVolumeReq)
 	if err != nil {
@@ -266,23 +242,6 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	tmpVol := volumeCreate(diskType, createVolumeResp.VolumeId, size, volumeContext, diskVol.Zone)
 
 	return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
-
-	//resp := &csi.CreateVolumeResponse{
-	//	Volume: &csi.Volume{
-	//		VolumeId:      createVolumeResp.VolumeId,
-	//		CapacityBytes: size,
-	//		AccessibleTopology: []*csi.Topology{
-	//			{
-	//				Segments: map[string]string{
-	//					util.NodeRegionKey: zone[:len(zone)-1],
-	//					util.NodeZoneKey:   zone,
-	//				},
-	//			},
-	//		},
-	//	},
-	//}
-	//
-	//return resp, nil
 }
 
 func createDisk(diskName string, size int64, diskVol *diskVolumeArgs, parameters SuperMapString) (*ebsClient.CreateVolumeReq, string, error) {
