@@ -36,6 +36,7 @@ type NodeServer struct {
 	mounter  Mounter
 }
 
+// GetNodeServer create node server
 func GetNodeServer(cfg *Config) *NodeServer {
 	nodeName := os.Getenv("KUBE_NODE_NAME")
 	if nodeName == "" {
@@ -60,6 +61,7 @@ func GetNodeServer(cfg *Config) *NodeServer {
 	if err != nil {
 		panic(err)
 	}
+	go UpdateNode(GlobalConfigVar.K8sClient.CoreV1().Nodes())
 	nodeServer.region = node.Labels[util.NodeRegionKey]
 	nodeServer.zone = node.Labels[util.NodeZoneKey]
 

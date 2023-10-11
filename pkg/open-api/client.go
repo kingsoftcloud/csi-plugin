@@ -73,8 +73,14 @@ func (cli *Client) buildRequestWithBodyReader(serviceName string, body io.Reader
 	}
 	endpoint := fmt.Sprintf("%v://%v.%v.%v/", cli.openApiPrefix, serviceName, cli.region, cli.openApiEndpoint)
 
-	req, _ := http.NewRequest("GET", endpoint, body)
-	req.Header.Set("Content-Type", "application/json")
+	method := "GET"
+	req, _ := http.NewRequest(method, endpoint, body)
+
+	if serviceName == "ebs" {
+		req.Header.Set("Content-Type", "application/json")
+	} else if serviceName == "kec" {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
 	req.Header.Set("Accept", "application/json")
 	// test
 	//req.Header.Set("X-KSC-ACCOUNT-ID", "73404680")
@@ -96,7 +102,7 @@ func (cli *Client) buildRequestWithBodyReader(serviceName string, body io.Reader
 	return req, seeker
 }
 
-func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
+func (cli *Client) DoRequest(service string, query string, payloads ...string) ([]byte, error) {
 	aksk := util.AKSK{}
 	ak, sk := cli.accessKeyId, cli.accessKeySecret
 	if ak == "" || sk == "" {
@@ -111,7 +117,16 @@ func (cli *Client) DoRequest(service string, query string) ([]byte, error) {
 	s := v4.Signer{Credentials: credentials.NewStaticCredentials(ak, sk, "")}
 	query = fmt.Sprintf("%v&Version=%v", query, Version)
 
-	req, body := cli.buildRequest(service, "")
+	var payload string
+	if len(payloads) == 0 {
+		payload = ""
+	} else {
+		payload = payloads[0]
+	}
+
+	req, body := cli.buildRequest(service, payload)
+
+	klog.V(1).Infoln("GET req is: ", req, "GET body is: ", body)
 
 	req.Header.Set("X-Ksc-Security-Token", aksk.SecurityToken)
 

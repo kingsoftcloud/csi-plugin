@@ -1,14 +1,19 @@
 package driver
 
 import (
+	pkg "csi-plugin/pkg/open-api"
 	"csi-plugin/util"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +24,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	k8sclient "k8s.io/client-go/kubernetes"
+	core_v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 var (
@@ -46,13 +52,33 @@ const (
 )
 
 var (
-	AvailableVolumeTypes  = []string{SSD2_0, SSD3_0, SATA3_0, EHDD, ESSD, "ESSD_PL1", "ESSD_PL2", "ESSD_PL3"}
+	AvailableVolumeTypes  = []string{SSD2_0, SSD3_0, SATA3_0, EHDD, ESSD, ESSD_PL1, ESSD_PL2, ESSD_PL3, ESSD_PL0}
 	CustomDiskTypes       = map[string]int{ESSD: 0, SSD3_0: 1, SSD2_0: 2, SATA3_0: 3, EHDD: 4}
 	CustomDiskPerfermance = map[string]string{DISK_PERFORMANCE_LEVEL0: "", DISK_PERFORMANCE_LEVEL1: "", DISK_PERFORMANCE_LEVEL2: "", DISK_PERFORMANCE_LEVEL3: ""}
 
 	// the map of multizone and index
 	storageClassZonePos = map[string]int{}
 )
+
+type DescribeInstanceTypeConfigsResp struct {
+	RequestID             string                  `json:"RequestId,omitempty"`
+	InstanceTypeConfigSet []InstanceTypeConfigSet `json:"InstanceTypeConfigSet,omitempty"`
+}
+type AvailabilityZoneSet struct {
+	AzCode string `json:"AzCode,omitempty"`
+}
+type DataDiskQuotaSet struct {
+	DataDiskType        string                `json:"DataDiskType,omitempty"`
+	DataDiskMinSize     float64               `json:"DataDiskMinSize,omitempty"`
+	DataDiskMaxsize     float64               `json:"DataDiskMaxsize,omitempty"`
+	DataDiskCount       int                   `json:"DataDiskCount,omitempty"`
+	AvailabilityZoneSet []AvailabilityZoneSet `json:"AvailabilityZoneSet,omitempty"`
+}
+type InstanceTypeConfigSet struct {
+	InstanceType     string             `json:"InstanceType,omitempty"`
+	InstanceFamily   string             `json:"InstanceFamily,omitempty"`
+	DataDiskQuotaSet []DataDiskQuotaSet `json:"DataDiskQuotaSet,omitempty"`
+}
 
 func validateCapabilities(caps []*csi.VolumeCapability) bool {
 	vcaps := []*csi.VolumeCapability_AccessMode{supportedAccessMode}
@@ -447,4 +473,100 @@ func intersect(slice1, slice2 []string) []string {
 		}
 	}
 	return nn
+}
+
+func UpdateNode(nodes core_v1.NodeInterface) {
+	ctx, cancel := context.WithTimeout(context.Background(), UpdateNodeTimeout)
+	defer cancel()
+	nodeName := os.Getenv(KubeNodeName)
+	nodeInfo, err := nodes.Get(ctx, nodeName, meta_v1.GetOptions{})
+	if err != nil {
+		klog.Errorf("UpdateNode:: get node info error : %s", err.Error())
+	}
+	instanceType := nodeInfo.Labels[instanceTypeLabel]
+	//zone := nodeInfo.Labels[NodeZoneKey]
+
+	if instanceType == "" {
+		instanceType = nodeInfo.Labels[KceLabelZoneKey]
+		//zone = nodeInfo.Labels[KecLabelZoneKey]
+	}
+
+	instanceStorageLabels := map[string]string{}
+	if instanceType != "" {
+		diskTypes, err := GetAvailableDiskTypes(instanceType)
+		if err != nil {
+			klog.Errorf("UpdateNode:: failed to get available disk types: %v", err)
+		} else {
+			for _, diskType := range diskTypes {
+				labelKey := fmt.Sprintf(nodeStorageLabel, diskType)
+				instanceStorageLabels[labelKey] = "available"
+			}
+		}
+	} else {
+		klog.Warningf("UpdateNode:: instaceType or zone is empty, skipping disk label update, instanceType: %s, zone: %s")
+	}
+
+	needUpdate := false
+	for l, v := range instanceStorageLabels {
+		if nodeInfo.Labels[l] != v {
+			needUpdate = true
+			break
+		}
+	}
+
+	if !needUpdate {
+		klog.Infof("UpdateNode:: no need to update node")
+		return
+	}
+	patch, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": instanceStorageLabels,
+		},
+	})
+	if err != nil {
+		klog.Errorf("UpdateNode:: failed to marshal patch json")
+	}
+
+	backoff := wait.Backoff{
+		Duration: time.Second,
+		Factor:   2.,
+		Steps:    9.,
+	}
+	for {
+		_, err = nodes.Patch(ctx, nodeName, types.StrategicMergePatchType, patch, meta_v1.PatchOptions{})
+		if err == nil {
+			break
+		}
+		klog.Errorf("UpdateNode:: failed to update node status: %v", err)
+		if errors.Is(err, ctx.Err()) {
+			return
+		}
+		time.Sleep(backoff.Step())
+	}
+	klog.V(5).Infof("UpdateNode:: finished")
+}
+
+func GetAvailableDiskTypes(instanceType string) (DataDiskTypes []string, err error) {
+	cli := pkg.New(GlobalConfigVar.OpenApiConfig)
+	DescribeInstanceTypeConfigsResp := &DescribeInstanceTypeConfigsResp{}
+	payloads := fmt.Sprintf("Filter.1.Name.1=instance-type&Filter.1.Value.1=%s", instanceType)
+
+	resp, err := cli.DoRequest("kec", "Action=DescribeInstanceTypeConfigs", payloads)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(resp, &DescribeInstanceTypeConfigsResp)
+	if err != nil {
+		klog.Error("Error decoding json: ", err)
+		return nil, err
+	}
+	InstanceTypeConfigSet := DescribeInstanceTypeConfigsResp.InstanceTypeConfigSet
+	DataDiskQuotaSet := InstanceTypeConfigSet[0].DataDiskQuotaSet
+
+	for _, DataDiskQuota := range DataDiskQuotaSet {
+		DataDiskTypes = append(DataDiskTypes, DataDiskQuota.DataDiskType)
+	}
+
+	return DataDiskTypes, nil
 }

@@ -2,6 +2,7 @@ package driver
 
 import (
 	ebsClient "csi-plugin/pkg/ebs-client"
+	api "csi-plugin/pkg/open-api"
 	"fmt"
 	"net"
 	"os"
@@ -46,7 +47,9 @@ type Config struct {
 
 // GlobalConfig save global values for plugin
 type GlobalConfig struct {
-	K8sClient *k8sclient.Clientset
+	K8sClient     *k8sclient.Clientset
+	EbsClient     ebsClient.StorageService
+	OpenApiConfig *api.ClientConfig
 }
 
 var (
