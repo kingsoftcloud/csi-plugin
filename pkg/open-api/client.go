@@ -131,8 +131,6 @@ func (cli *Client) DoRequest(service string, query string, payloads ...string) (
 
 	req, body := cli.buildRequest(service, payload)
 
-	klog.V(1).Infoln("GET req is: ", req, "GET body is: ", body)
-
 	req.Header.Set("X-Ksc-Security-Token", aksk.SecurityToken)
 
 	req.URL.RawQuery = query

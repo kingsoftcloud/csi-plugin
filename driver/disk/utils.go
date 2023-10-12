@@ -109,6 +109,16 @@ type InstanceTypeConfigSet struct {
 	DataDiskQuotaSet []DataDiskQuotaSet `json:"DataDiskQuotaSet,omitempty"`
 }
 
+type VolumesInfoResp struct {
+	RequestID string    `json:"RequestId,omitempty"`
+	Volumes   []Volumes `json:"Volumes,omitempty"`
+}
+type Volumes struct {
+	VolumeID   string `json:"VolumeId,omitempty"`
+	VolumeName string `json:"VolumeName,omitempty"`
+	VolumeType string `json:"VolumeType,omitempty"`
+}
+
 func validateCapabilities(caps []*csi.VolumeCapability) bool {
 	vcaps := []*csi.VolumeCapability_AccessMode{supportedAccessMode}
 
@@ -613,7 +623,7 @@ func GetInstanceType(InstanceId string) (InstanceType string, err error) {
 	DescribeInstancesResp := &DescribeInstancesResp{}
 	payload := fmt.Sprintf("InstanceId.1=%s", InstanceId)
 	for n, ProjectId := range ProjectIds {
-		payload = payload + fmt.Sprintf("&ProjectId.%v=%v", n, ProjectId)
+		payload = payload + fmt.Sprintf("&ProjectId.%v=%v", n+1, ProjectId)
 	}
 
 	resp, err := cli.DoRequest("kec", "Action=DescribeInstances", payload)
@@ -655,4 +665,24 @@ func GetAvailableDiskTypes(instanceType string) (DataDiskTypes []string, err err
 	}
 
 	return DataDiskTypes, nil
+}
+
+func GetVolumeInfo(VolumeId string) (VolumeType string, err error) {
+	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
+	VolumesInfoResp := &VolumesInfoResp{}
+
+	query := "Action=DescribeVolumes&" + VolumeId
+	resp, err := cli.DoRequest("kec", query)
+	if err != nil {
+		return "", err
+	}
+
+	err = json.Unmarshal(resp, &VolumesInfoResp)
+	if err != nil {
+		klog.Error("Error decoding json: ", err)
+		return "", err
+	}
+	VolumeType = VolumesInfoResp.Volumes[0].VolumeType
+
+	return VolumeType, nil
 }
