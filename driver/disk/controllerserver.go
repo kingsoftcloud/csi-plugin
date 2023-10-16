@@ -2,6 +2,7 @@ package driver
 
 import (
 	ebsClient "csi-plugin/pkg/ebs-client"
+	"csi-plugin/util"
 	"errors"
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -149,7 +150,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	// 给 ebs 创建硬盘的时间
 	time.Sleep(5 * time.Second)
 
-	// get volume first, if it's created do no thing
+	// get volume first, if it's created do nothing
 	listVolumesResp, err := cs.ebsClient.GetVolumeByName(&ebsClient.ListVolumesReq{
 		VolumeExactName: volumeName,
 		VolumeCategory:  "data",
@@ -242,20 +243,17 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	}
 	klog.V(5).Infof("CreateVolume: volume: %s", req.GetName())
 
-	createVolumeResp, err := cs.ebsClient.CreateVolume(createVolumeReq)
-	if err != nil {
-		return nil, err
-	volumeID := ""
+	var createVolumeResp *ebsClient.CreateVolumeResp
+
 	for i := 0; i < len(req.AccessibilityRequirements.Preferred); i++ {
 		if !isZoneSpecified {
 			segments := req.AccessibilityRequirements.Preferred[i]
 			createVolumeReq.AvailabilityZone = segments.Segments[util.NodeZoneKey]
 			zone = createVolumeReq.AvailabilityZone
 		}
-		createVolumeResp, err := cs.ebsClient.CreateVolume(createVolumeReq)
+		createVolumeResp, err = cs.ebsClient.CreateVolume(createVolumeReq)
 		// if createVolume success
 		if err == nil {
-			volumeID = createVolumeResp.VolumeId
 			break
 		}
 		// if createVolume err and zoneSelection or last preffered
@@ -268,20 +266,6 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 
 	return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
 }
-	resp := &csi.CreateVolumeResponse{
-		Volume: &csi.Volume{
-			VolumeId:      volumeID,
-			CapacityBytes: size,
-			AccessibleTopology: []*csi.Topology{
-				{
-					Segments: map[string]string{
-						util.NodeRegionKey: zone[:len(zone)-1],
-						util.NodeZoneKey:   zone,
-					},
-				},
-			},
-		},
-	}
 
 func createDisk(diskName string, size int64, diskVol *diskVolumeArgs, parameters SuperMapString) (*ebsClient.CreateVolumeReq, string, error) {
 	createDiskRequest := &ebsClient.CreateVolumeReq{}

@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: essd
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: essd
+  resources:
+    requests:
+      storage: 40Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ssd
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ssd
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wffc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: wffc
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wffc-essd
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: wffc-essd
+  resources:
+    requests:
+      storage: 40Gi
