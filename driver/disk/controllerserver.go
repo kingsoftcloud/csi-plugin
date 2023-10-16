@@ -206,12 +206,20 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 
 	//var region string
 	zone := parameters.Get("zone", "")
+	isZoneSpecified := true
 	if len(zone) == 0 {
-		_, zone, err = cs.k8sClient.GetNodeRegionZone()
-		if err != nil {
-			return nil, err
+		isZoneSpecified = false
+		if len(req.AccessibilityRequirements.Preferred) != 0 {
+			// choose the most preffer zone
+			segments := req.AccessibilityRequirements.Preferred[0]
+			zone = segments.Segments[util.NodeZoneKey]
+		} else {
+			_, zone, err = cs.k8sClient.GetNodeRegionZone()
+			if err != nil {
+				return nil, err
+			}
+			klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", zone))
 		}
-		klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", zone))
 	}
 	diskVol.Zone = zone
 
@@ -237,12 +245,43 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	createVolumeResp, err := cs.ebsClient.CreateVolume(createVolumeReq)
 	if err != nil {
 		return nil, err
+	volumeID := ""
+	for i := 0; i < len(req.AccessibilityRequirements.Preferred); i++ {
+		if !isZoneSpecified {
+			segments := req.AccessibilityRequirements.Preferred[i]
+			createVolumeReq.AvailabilityZone = segments.Segments[util.NodeZoneKey]
+			zone = createVolumeReq.AvailabilityZone
+		}
+		createVolumeResp, err := cs.ebsClient.CreateVolume(createVolumeReq)
+		// if createVolume success
+		if err == nil {
+			volumeID = createVolumeResp.VolumeId
+			break
+		}
+		// if createVolume err and zoneSelection or last preffered
+		if (err != nil && isZoneSpecified) || (err != nil && i == len(req.AccessibilityRequirements.Preferred)-1) {
+			return nil, err
+		}
 	}
 
 	tmpVol := volumeCreate(diskType, createVolumeResp.VolumeId, size, volumeContext, diskVol.Zone)
 
 	return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
 }
+	resp := &csi.CreateVolumeResponse{
+		Volume: &csi.Volume{
+			VolumeId:      volumeID,
+			CapacityBytes: size,
+			AccessibleTopology: []*csi.Topology{
+				{
+					Segments: map[string]string{
+						util.NodeRegionKey: zone[:len(zone)-1],
+						util.NodeZoneKey:   zone,
+					},
+				},
+			},
+		},
+	}
 
 func createDisk(diskName string, size int64, diskVol *diskVolumeArgs, parameters SuperMapString) (*ebsClient.CreateVolumeReq, string, error) {
 	createDiskRequest := &ebsClient.CreateVolumeReq{}
