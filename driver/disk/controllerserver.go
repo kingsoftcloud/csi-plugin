@@ -183,12 +183,20 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	// parameters 不再传递region字段
 	//var region string
 	zone := parameters.Get("zone", "")
+	isZoneSpecified := true
 	if len(zone) == 0 {
-		_, zone, err = cs.k8sClient.GetNodeRegionZone()
-		if err != nil {
-			return nil, err
+		isZoneSpecified = false
+		if len(req.AccessibilityRequirements.Preferred) != 0 {
+			// choose the most preffer zone
+			segments := req.AccessibilityRequirements.Preferred[0]
+			zone = segments.Segments[util.NodeZoneKey]
+		} else {
+			_, zone, err = cs.k8sClient.GetNodeRegionZone()
+			if err != nil {
+				return nil, err
+			}
+			klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", zone))
 		}
-		klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", zone))
 	}
 
 	tags, err := parseTags(parameters.Get("tags", ""))
@@ -217,15 +225,28 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	if purchaseTime != 0 {
 		createVolumeReq.PurchaseTime = purchaseTime
 	}
-
-	createVolumeResp, err := cs.ebsClient.CreateVolume(createVolumeReq)
-	if err != nil {
-		return nil, err
+	volumeID := ""
+	for i := 0; i < len(req.AccessibilityRequirements.Preferred); i++ {
+		if !isZoneSpecified {
+			segments := req.AccessibilityRequirements.Preferred[i]
+			createVolumeReq.AvailabilityZone = segments.Segments[util.NodeZoneKey]
+			zone = createVolumeReq.AvailabilityZone
+		}
+		createVolumeResp, err := cs.ebsClient.CreateVolume(createVolumeReq)
+		// if createVolume success
+		if err == nil {
+			volumeID = createVolumeResp.VolumeId
+			break
+		}
+		// if createVolume err and zoneSelection or last preffered
+		if (err != nil && isZoneSpecified) || (err != nil && i == len(req.AccessibilityRequirements.Preferred)-1) {
+			return nil, err
+		}
 	}
 
 	resp := &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
-			VolumeId:      createVolumeResp.VolumeId,
+			VolumeId:      volumeID,
 			CapacityBytes: size,
 			AccessibleTopology: []*csi.Topology{
 				{
