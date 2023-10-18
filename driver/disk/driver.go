@@ -2,6 +2,7 @@ package driver
 
 import (
 	ebsClient "csi-plugin/pkg/ebs-client"
+	api "csi-plugin/pkg/open-api"
 	"fmt"
 	"net"
 	"os"
@@ -43,6 +44,17 @@ type Config struct {
 	MetricEnabled          bool
 	MaxVolumesPerNode      int64
 }
+
+// GlobalConfig save global values for plugin
+type GlobalConfig struct {
+	K8sClient     *k8sclient.Clientset
+	EbsClient     ebsClient.StorageService
+	OpenApiConfig *api.ClientConfig
+}
+
+var (
+	GlobalConfigVar GlobalConfig
+)
 
 func NewDriver(config *Config) *Driver {
 	if config.DriverName == "" {

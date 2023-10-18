@@ -20,6 +20,10 @@ import (
 	"k8s.io/klog"
 )
 
+//func init() {
+//	flag.Set("logtostderr", "true")
+//}
+
 const (
 	EBSdriverName          = "com.ksc.csi.diskplugin"
 	NFSDriverName          = "com.ksc.csi.nfsplugin"
@@ -82,7 +86,7 @@ type ClusterInfo struct {
 }
 
 func getEBSDriver(epName string) *ebs.Driver {
-	OpenApiConfig := &api.ClientConfig{
+	ebs.GlobalConfigVar.OpenApiConfig = &api.ClientConfig{
 		AccessKeyId:     *accessKeyId,
 		AccessKeySecret: *accessKeySecret,
 		OpenApiEndpoint: *openApiEndpoint,
@@ -90,6 +94,8 @@ func getEBSDriver(epName string) *ebs.Driver {
 		Region:          *region,
 		Timeout:         *timeout,
 	}
+	ebs.GlobalConfigVar.K8sClient = newK8SClient()
+	ebs.GlobalConfigVar.EbsClient = ebsClient.New(ebs.GlobalConfigVar.OpenApiConfig)
 
 	cfg := &ebs.Config{
 		EndPoint:               epName,
@@ -98,13 +104,15 @@ func getEBSDriver(epName string) *ebs.Driver {
 		EnableVolumeExpansion:  *volumeExpansion,
 		MaxVolumeSize:          *maxVolumeSize,
 		DriverName:             EBSdriverName,
-		K8sClient:              newK8SClient(),
-		EbsClient:              ebsClient.New(OpenApiConfig),
+		K8sClient:              ebs.GlobalConfigVar.K8sClient,
+		EbsClient:              ebs.GlobalConfigVar.EbsClient,
 		MetricEnabled:          *metric,
 		Version:                version,
 		MaxVolumesPerNode:      *maxVolumesPerNode,
 	}
 	klog.V(5).Infof("disk driver config: %+v", cfg)
+
+	klog.V(5).Infof("GlobalConfigVar driver config: %+v", ebs.GlobalConfigVar.K8sClient)
 
 	return ebs.NewDriver(cfg)
 }
@@ -129,12 +137,9 @@ func replaceEndpoint(driverType, endpointName string) string {
 	return strings.Replace(endpointName, TypePluginVar, driverType, -1)
 }
 
-func init() {
-	flag.Set("logtostderr", "true")
-}
-
 func main() {
 	klog.InitFlags(nil)
+	flag.Set("logtostderr", "true")
 	flag.Parse()
 	klog.Infof("CSI Driver Name: %s, version: %s, endPoints: %s", *driverName, version, *endpoint)
 	util.InitAksk(newK8SClient())

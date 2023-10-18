@@ -1,9 +1,19 @@
 package driver
 
 import (
+	OpenApi "csi-plugin/pkg/open-api"
 	"csi-plugin/util"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +24,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	k8sclient "k8s.io/client-go/kubernetes"
+	core_v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 var (
@@ -39,6 +50,74 @@ const (
 	// the size they provided did not satisfy our requirements
 	defaultVolumeSizeInBytes int64 = 16 * GB
 )
+
+var (
+	AvailableVolumeTypes  = []string{SSD2_0, SSD3_0, SATA3_0, EHDD, ESSD, ESSD_PL1, ESSD_PL2, ESSD_PL3, ESSD_PL0}
+	CustomDiskTypes       = map[string]int{ESSD: 0, SSD3_0: 1, SSD2_0: 2, SATA3_0: 3, EHDD: 4}
+	CustomDiskPerfermance = map[string]string{DISK_PERFORMANCE_LEVEL0: "", DISK_PERFORMANCE_LEVEL1: "", DISK_PERFORMANCE_LEVEL2: "", DISK_PERFORMANCE_LEVEL3: ""}
+
+	// the map of multizone and index
+	storageClassZonePos = map[string]int{}
+)
+
+type AccountAllProjectListResp struct {
+	ListProjectResult ListProjectResult `json:"ListProjectResult,omitempty"`
+	RequestID         string            `json:"RequestId,omitempty"`
+}
+type ProjectList struct {
+	ProjectID int    `json:"ProjectId,omitempty"`
+	Status    int    `json:"Status,omitempty"`
+	Krn       string `json:"Krn,omitempty"`
+	AccountID string `json:"AccountId,omitempty"`
+}
+type ListProjectResult struct {
+	Total       int           `json:"Total,omitempty"`
+	ProjectList []ProjectList `json:"ProjectList,omitempty"`
+}
+
+type DescribeInstancesResp struct {
+	Marker        int            `json:"Marker,omitempty"`
+	InstanceCount int            `json:"InstanceCount,omitempty"`
+	RequestID     string         `json:"RequestId,omitempty"`
+	InstancesSet  []InstancesSet `json:"InstancesSet,omitempty"`
+}
+type InstanceState struct {
+	Name string `json:"Name,omitempty"`
+}
+type InstancesSet struct {
+	InstanceType  string        `json:"InstanceType,omitempty"`
+	InstanceState InstanceState `json:"InstanceState,omitempty"`
+}
+
+type DescribeInstanceTypeConfigsResp struct {
+	RequestID             string                  `json:"RequestId,omitempty"`
+	InstanceTypeConfigSet []InstanceTypeConfigSet `json:"InstanceTypeConfigSet,omitempty"`
+}
+type AvailabilityZoneSet struct {
+	AzCode string `json:"AzCode,omitempty"`
+}
+type DataDiskQuotaSet struct {
+	DataDiskType        string                `json:"DataDiskType,omitempty"`
+	DataDiskMinSize     float64               `json:"DataDiskMinSize,omitempty"`
+	DataDiskMaxsize     float64               `json:"DataDiskMaxsize,omitempty"`
+	DataDiskCount       int                   `json:"DataDiskCount,omitempty"`
+	AvailabilityZoneSet []AvailabilityZoneSet `json:"AvailabilityZoneSet,omitempty"`
+}
+type InstanceTypeConfigSet struct {
+	InstanceType     string             `json:"InstanceType,omitempty"`
+	InstanceFamily   string             `json:"InstanceFamily,omitempty"`
+	DataDiskQuotaSet []DataDiskQuotaSet `json:"DataDiskQuotaSet,omitempty"`
+}
+
+type VolumesInfoResp struct {
+	RequestID string    `json:"RequestId,omitempty"`
+	Volumes   []Volumes `json:"Volumes,omitempty"`
+}
+type Volumes struct {
+	VolumeID   string `json:"VolumeId,omitempty"`
+	VolumeName string `json:"VolumeName,omitempty"`
+	VolumeType string `json:"VolumeType,omitempty"`
+}
 
 func validateCapabilities(caps []*csi.VolumeCapability) bool {
 	vcaps := []*csi.VolumeCapability_AccessMode{supportedAccessMode}
@@ -249,4 +328,361 @@ func (kc *K8sClientWrap) IsNodeStatusReady(nodeID string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// getVolumeOptions
+func getVolumeOptions(req *csi.CreateVolumeRequest) (*volumeArgs, error) {
+	//var ok bool
+	volArgArgs := &volumeArgs{
+		DiskTags: map[string]string{},
+	}
+	volOptions := req.GetParameters()
+
+	//TODO: 获取AZ
+	//zone := parameters.Get("zone", "")
+	//if volArgArgs.Zone, ok = volOptions["zone"]; !ok {
+	//	if volArgArgs.Zone, ok = volOptions[strings.ToLower("zone")]; !ok {
+	//		// 选择Zone
+	//		volArgArgs.Zone = pickZone(req.GetAccessibilityRequirements())
+	//		if volArgArgs.Zone == "" {
+	//			klog.Errorf("CreateVolume: Can't get topology info , please check your setup or set zone in storage class. Use zone from service: %s", req.Name)
+	//			volArgArgs.Zone, _ = utils.Get
+	//		}
+	//	}
+	//}
+
+	//TODO: Support Multi zones if set
+	//zoneStr := volArgArgs.Zone
+	//zones := strings.Split(zoneStr, ",")
+	//zoneNum := len(zones)
+	//if zoneNum > 1 {
+	//	if _, ok := storageClassZonePos[zoneStr]; !ok {
+	//		storageClassZonePos[zoneStr] = 0
+	//	}
+	//	zoneIndex := storageClassZonePos[zoneStr] % zoneNum
+	//	volArgArgs.Zone = zones[zoneIndex]
+	//	storageClassZonePos[zoneStr]++
+	//}
+	//volArgArgs.Region, ok = volOptions["region"]
+	//if !ok {
+	//	volArgArgs.Region = GlobalConfigVar.Region
+	//}
+
+	volArgArgs.NodeSelected, _ = volOptions[NodeSchedueTag]
+
+	// disk Type
+	diskType, err := validateDiskType(volOptions)
+	if err != nil {
+		return nil, fmt.Errorf("Illegal required parameter type: " + volArgArgs.Type)
+	}
+	volArgArgs.Type = diskType
+	pls, err := validateDiskPerformaceLevel(volOptions)
+	if err != nil {
+		return nil, err
+	}
+	volArgArgs.PerformanceLevel = pls
+
+	// diskTags
+	diskTags, ok := volOptions["tags"]
+	if ok {
+		for _, tag := range strings.Split(diskTags, ",") {
+			k, v, found := strings.Cut(tag, ":")
+			if !found {
+				return nil, status.Errorf(codes.InvalidArgument, "Invalid diskTags format name: %s tags: %s", req.GetName(), diskTags)
+			}
+			volArgArgs.DiskTags[k] = v
+		}
+	}
+	//TODO: 将PV信息作为diskTags
+
+	return volArgArgs, nil
+}
+
+func validateDiskType(opts map[string]string) (diskType string, err error) {
+
+	if strings.Contains(opts["type"], ",") {
+		orderedList := []string{}
+		for _, cusType := range strings.Split(opts["type"], ",") {
+			if _, ok := CustomDiskTypes[cusType]; ok {
+				orderedList = append(orderedList, cusType)
+			} else {
+				return diskType, fmt.Errorf("Illegal required parameter type: " + cusType)
+			}
+		}
+		diskType = strings.Join(orderedList, ",")
+		return
+	}
+	for _, t := range AvailableVolumeTypes {
+		if opts["type"] == t {
+			diskType = t
+		}
+	}
+	if diskType == "" {
+		return diskType, fmt.Errorf("Illegal required parameter type: " + opts["type"])
+	}
+	return
+}
+
+func validateDiskPerformaceLevel(opts map[string]string) (performaceLevel string, err error) {
+	pl, ok := opts[ESSD_PERFORMANCE_LEVEL]
+	if !ok || pl == "" {
+		return "", nil
+	}
+	klog.Infof("validateDiskPerformaceLevel: pl: %v", pl)
+	if strings.Contains(pl, ",") {
+		for _, cusPer := range strings.Split(pl, ",") {
+			if _, ok := CustomDiskPerfermance[cusPer]; !ok {
+				return "", fmt.Errorf("illegal performace level type: %s", cusPer)
+			}
+		}
+	}
+	return pl, nil
+}
+
+func getCsiVolumeInfo(diskType string, volumeId string, size int64, volumeContext map[string]string, zone string) *csi.Volume {
+	accessibleTopology := []*csi.Topology{
+		{
+			Segments: map[string]string{
+				util.NodeRegionKey:                      zone[:len(zone)-1],
+				util.NodeZoneKey:                        zone,
+				fmt.Sprintf(nodeStorageLabel, diskType): "available",
+			},
+		},
+	}
+	if diskType != "" {
+		//Add PV Label
+		diskTypePL := diskType
+		if diskType == ESSD {
+			if pl, ok := volumeContext[ESSD_PERFORMANCE_LEVEL]; ok && pl != "" {
+				diskTypePL = fmt.Sprintf("%s,%s", ESSD, pl)
+			} else {
+				diskTypePL = fmt.Sprintf("%s.%s", ESSD, "PL1")
+			}
+		}
+		volumeContext[labelAppendPrefix+labelVolumeType] = diskTypePL
+
+		// Add PV NodeAffinity
+		labelKey := fmt.Sprintf(nodeStorageLabel, diskType)
+		expressions := []v1.NodeSelectorRequirement{{
+			Key:      labelKey,
+			Operator: v1.NodeSelectorOpIn,
+			Values:   []string{"available"},
+		}}
+		terms := []v1.NodeSelectorTerm{{
+			MatchExpressions: expressions,
+		}}
+		diskTypeTopo := &v1.NodeSelector{
+			NodeSelectorTerms: terms,
+		}
+		diskTypeTopoBytes, _ := json.Marshal(diskTypeTopo)
+		volumeContext[annAppendPrefix+annVolumeTopoKey] = string(diskTypeTopoBytes)
+	}
+
+	klog.V(5).Infof("volumeCreate: volumeContext: %+v", volumeContext)
+	tmpVol := &csi.Volume{
+		CapacityBytes:      size,
+		VolumeId:           volumeId,
+		VolumeContext:      volumeContext,
+		AccessibleTopology: accessibleTopology,
+	}
+
+	return tmpVol
+}
+
+func deleteEmpty(s []string) []string {
+	var a []string
+	for _, str := range s {
+		if str != "" {
+			a = append(a, str)
+		}
+	}
+	return a
+}
+
+func intersect(slice1, slice2 []string) []string {
+	m := make(map[string]int)
+	nn := make([]string, 0)
+	for _, v := range slice1 {
+		m[v]++
+	}
+	for _, v := range slice2 {
+		times, _ := m[v]
+		if times == 1 {
+			nn = append(nn, v)
+		}
+	}
+	return nn
+}
+
+func UpdateNode(nodes core_v1.NodeInterface) {
+	ctx, cancel := context.WithTimeout(context.Background(), UpdateNodeTimeout)
+	defer cancel()
+	nodeName := os.Getenv(KubeNodeName)
+	nodeInfo, err := nodes.Get(ctx, nodeName, meta_v1.GetOptions{})
+	if err != nil {
+		klog.Errorf("UpdateNode:: get node info error : %s", err.Error())
+	}
+	instanceType := nodeInfo.Labels[instanceTypeLabel]
+	//zone := nodeInfo.Labels[NodeZoneKey]
+
+	if instanceType == "" {
+		instanceType, err = GetInstanceType(nodeInfo.Annotations[InstanceUuid])
+		if err != nil {
+			return
+		}
+		//instanceType = nodeInfo.Labels[KceLabelZoneKey]
+		//zone = nodeInfo.Labels[KecLabelZoneKey]
+	}
+
+	instanceStorageLabels := map[string]string{}
+	if instanceType != "" {
+		diskTypes, err := GetAvailableDiskTypes(instanceType)
+		if err != nil {
+			klog.Errorf("UpdateNode:: failed to get available disk types: %v", err)
+		} else {
+			for _, diskType := range diskTypes {
+				labelKey := fmt.Sprintf(nodeStorageLabel, diskType)
+				instanceStorageLabels[labelKey] = "available"
+			}
+		}
+	} else {
+		klog.Warningf("UpdateNode:: instaceType or zone is empty, skipping disk label update, instanceType: %s, zone: %s")
+	}
+
+	needUpdate := false
+	for l, v := range instanceStorageLabels {
+		if nodeInfo.Labels[l] != v {
+			needUpdate = true
+			break
+		}
+	}
+
+	if !needUpdate {
+		klog.Infof("UpdateNode:: no need to update node")
+		return
+	}
+	patch, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": instanceStorageLabels,
+		},
+	})
+	if err != nil {
+		klog.Errorf("UpdateNode:: failed to marshal patch json")
+	}
+
+	backoff := wait.Backoff{
+		Duration: time.Second,
+		Factor:   2.,
+		Steps:    9.,
+	}
+	for {
+		_, err = nodes.Patch(ctx, nodeName, types.StrategicMergePatchType, patch, meta_v1.PatchOptions{})
+		if err == nil {
+			break
+		}
+		klog.Errorf("UpdateNode:: failed to update node status: %v", err)
+		if errors.Is(err, ctx.Err()) {
+			return
+		}
+		time.Sleep(backoff.Step())
+	}
+	klog.V(5).Infof("UpdateNode:: finished")
+}
+
+func GetProjectId() (ProjectId []int, err error) {
+	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
+	AccountAllProjectListResp := &AccountAllProjectListResp{}
+
+	resp, err := cli.DoRequest("iam", "Action=GetAccountAllProjectList", "")
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(resp, &AccountAllProjectListResp)
+	if err != nil {
+		klog.Error("Error decoding json: ", err)
+		return nil, err
+	}
+	ListProjectResult := AccountAllProjectListResp.ListProjectResult
+	ProjectList := ListProjectResult.ProjectList
+
+	for _, Project := range ProjectList {
+		ProjectId = append(ProjectId, Project.ProjectID)
+	}
+
+	return ProjectId, nil
+}
+
+func GetInstanceType(InstanceId string) (InstanceType string, err error) {
+	ProjectIds, err := GetProjectId()
+	if err != nil {
+		return "", err
+	}
+
+	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
+	DescribeInstancesResp := &DescribeInstancesResp{}
+	payload := fmt.Sprintf("InstanceId.1=%s", InstanceId)
+	for n, ProjectId := range ProjectIds {
+		payload = payload + fmt.Sprintf("&ProjectId.%v=%v", n+1, ProjectId)
+	}
+
+	resp, err := cli.DoRequest("kec", "Action=DescribeInstances", payload)
+	if err != nil {
+		return "", err
+	}
+
+	err = json.Unmarshal(resp, &DescribeInstancesResp)
+	if err != nil {
+		klog.Error("Error decoding json: ", err)
+		return "", err
+	}
+	InstancesSet := DescribeInstancesResp.InstancesSet
+	InstanceType = InstancesSet[0].InstanceType
+
+	return InstanceType, nil
+}
+
+func GetAvailableDiskTypes(instanceType string) (DataDiskTypes []string, err error) {
+	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
+	DescribeInstanceTypeConfigsResp := &DescribeInstanceTypeConfigsResp{}
+	payloads := fmt.Sprintf("Filter.1.Name.1=instance-type&Filter.1.Value.1=%s", instanceType)
+
+	resp, err := cli.DoRequest("kec", "Action=DescribeInstanceTypeConfigs", payloads)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(resp, &DescribeInstanceTypeConfigsResp)
+	if err != nil {
+		klog.Error("Error decoding json: ", err)
+		return nil, err
+	}
+	InstanceTypeConfigSet := DescribeInstanceTypeConfigsResp.InstanceTypeConfigSet
+	DataDiskQuotaSet := InstanceTypeConfigSet[0].DataDiskQuotaSet
+
+	for _, DataDiskQuota := range DataDiskQuotaSet {
+		DataDiskTypes = append(DataDiskTypes, DataDiskQuota.DataDiskType)
+	}
+
+	return DataDiskTypes, nil
+}
+
+func GetVolumeInfo(VolumeId string) (VolumeType string, err error) {
+	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
+	VolumesInfoResp := &VolumesInfoResp{}
+
+	query := "Action=DescribeVolumes&" + VolumeId
+	resp, err := cli.DoRequest("kec", query)
+	if err != nil {
+		return "", err
+	}
+
+	err = json.Unmarshal(resp, &VolumesInfoResp)
+	if err != nil {
+		klog.Error("Error decoding json: ", err)
+		return "", err
+	}
+	VolumeType = VolumesInfoResp.Volumes[0].VolumeType
+
+	return VolumeType, nil
 }

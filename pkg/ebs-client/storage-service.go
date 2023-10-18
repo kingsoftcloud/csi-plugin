@@ -23,16 +23,20 @@ type StorageService interface {
 
 type VolumeStatusType string
 
-var VolumeTypes = []string{SSD2_0, SSD3_0, SATA3_0, EHDD, "ESSD_PL0", "ESSD_PL1", "ESSD_PL2", "ESSD_PL3"}
+var VolumeTypes = []string{SSD2_0, SSD3_0, SATA3_0, EHDD, ESSD_PL1, ESSD_PL2, ESSD_PL3, ESSD_PL0}
 
 const (
 	Separator = "&"
 
 	// volume type
-	SSD2_0  string = "SSD2.0"
-	SSD3_0  string = "SSD3.0"
-	SATA3_0 string = "SATA3.0"
-	EHDD    string = "EHDD"
+	SSD2_0   string = "SSD2.0"
+	SSD3_0   string = "SSD3.0"
+	SATA3_0  string = "SATA3.0"
+	EHDD     string = "EHDD"
+	ESSD_PL0 string = "ESSD_PL0"
+	ESSD_PL1 string = "ESSD_PL1"
+	ESSD_PL2 string = "ESSD_PL2"
+	ESSD_PL3 string = "ESSD_PL3"
 
 	VolumeTypesRegexp = "^(SSD2.0|SSD3.0|SATA3.0|ESSD_PL0|ESSD_PL1|ESSD_PL2|ESSD_PL3|EHDD)$"
 

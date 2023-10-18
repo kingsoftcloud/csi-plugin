@@ -44,6 +44,6 @@ func GetAKSK() (AKSK, error) {
 	}
 	aksk.SecurityToken = securityToken
 
-	//klog.V(5).Infof("get AK: %s, SK: %s, region: %s", aksk.AK, aksk.SK, aksk.Region)
+	klog.V(5).Infof("get AK: %s, SK: %s, region: %s", aksk.AK, aksk.SK, aksk.Region)
 	return aksk, nil
 }
