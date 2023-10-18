@@ -330,29 +330,29 @@ func (kc *K8sClientWrap) IsNodeStatusReady(nodeID string) (bool, error) {
 	return false, nil
 }
 
-// getDiskVolumeOptions
-func getDiskVolumeOptions(req *csi.CreateVolumeRequest) (*diskVolumeArgs, error) {
+// getVolumeOptions
+func getVolumeOptions(req *csi.CreateVolumeRequest) (*volumeArgs, error) {
 	//var ok bool
-	diskVolArgs := &diskVolumeArgs{
+	volArgArgs := &volumeArgs{
 		DiskTags: map[string]string{},
 	}
 	volOptions := req.GetParameters()
 
 	//TODO: 获取AZ
 	//zone := parameters.Get("zone", "")
-	//if diskVolArgs.Zone, ok = volOptions["zone"]; !ok {
-	//	if diskVolArgs.Zone, ok = volOptions[strings.ToLower("zone")]; !ok {
+	//if volArgArgs.Zone, ok = volOptions["zone"]; !ok {
+	//	if volArgArgs.Zone, ok = volOptions[strings.ToLower("zone")]; !ok {
 	//		// 选择Zone
-	//		diskVolArgs.Zone = pickZone(req.GetAccessibilityRequirements())
-	//		if diskVolArgs.Zone == "" {
+	//		volArgArgs.Zone = pickZone(req.GetAccessibilityRequirements())
+	//		if volArgArgs.Zone == "" {
 	//			klog.Errorf("CreateVolume: Can't get topology info , please check your setup or set zone in storage class. Use zone from service: %s", req.Name)
-	//			diskVolArgs.Zone, _ = utils.Get
+	//			volArgArgs.Zone, _ = utils.Get
 	//		}
 	//	}
 	//}
 
 	//TODO: Support Multi zones if set
-	//zoneStr := diskVolArgs.Zone
+	//zoneStr := volArgArgs.Zone
 	//zones := strings.Split(zoneStr, ",")
 	//zoneNum := len(zones)
 	//if zoneNum > 1 {
@@ -360,27 +360,27 @@ func getDiskVolumeOptions(req *csi.CreateVolumeRequest) (*diskVolumeArgs, error)
 	//		storageClassZonePos[zoneStr] = 0
 	//	}
 	//	zoneIndex := storageClassZonePos[zoneStr] % zoneNum
-	//	diskVolArgs.Zone = zones[zoneIndex]
+	//	volArgArgs.Zone = zones[zoneIndex]
 	//	storageClassZonePos[zoneStr]++
 	//}
-	//diskVolArgs.Region, ok = volOptions["region"]
+	//volArgArgs.Region, ok = volOptions["region"]
 	//if !ok {
-	//	diskVolArgs.Region = GlobalConfigVar.Region
+	//	volArgArgs.Region = GlobalConfigVar.Region
 	//}
 
-	diskVolArgs.NodeSelected, _ = volOptions[NodeSchedueTag]
+	volArgArgs.NodeSelected, _ = volOptions[NodeSchedueTag]
 
 	// disk Type
 	diskType, err := validateDiskType(volOptions)
 	if err != nil {
-		return nil, fmt.Errorf("Illegal required parameter type: " + diskVolArgs.Type)
+		return nil, fmt.Errorf("Illegal required parameter type: " + volArgArgs.Type)
 	}
-	diskVolArgs.Type = diskType
+	volArgArgs.Type = diskType
 	pls, err := validateDiskPerformaceLevel(volOptions)
 	if err != nil {
 		return nil, err
 	}
-	diskVolArgs.PerformanceLevel = pls
+	volArgArgs.PerformanceLevel = pls
 
 	// diskTags
 	diskTags, ok := volOptions["tags"]
@@ -390,12 +390,12 @@ func getDiskVolumeOptions(req *csi.CreateVolumeRequest) (*diskVolumeArgs, error)
 			if !found {
 				return nil, status.Errorf(codes.InvalidArgument, "Invalid diskTags format name: %s tags: %s", req.GetName(), diskTags)
 			}
-			diskVolArgs.DiskTags[k] = v
+			volArgArgs.DiskTags[k] = v
 		}
 	}
 	//TODO: 将PV信息作为diskTags
 
-	return diskVolArgs, nil
+	return volArgArgs, nil
 }
 
 func validateDiskType(opts map[string]string) (diskType string, err error) {
@@ -439,7 +439,7 @@ func validateDiskPerformaceLevel(opts map[string]string) (performaceLevel string
 	return pl, nil
 }
 
-func volumeCreate(diskType string, volumeId string, size int64, volumeContext map[string]string, zone string) *csi.Volume {
+func getCsiVolumeInfo(diskType string, volumeId string, size int64, volumeContext map[string]string, zone string) *csi.Volume {
 	accessibleTopology := []*csi.Topology{
 		{
 			Segments: map[string]string{

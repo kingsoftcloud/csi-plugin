@@ -46,8 +46,8 @@ type KscEBSControllerServer struct {
 	ebsClient ebsClient.StorageService
 }
 
-// Disk parameters
-type diskVolumeArgs struct {
+// volume parameters
+type volumeArgs struct {
 	Type             string            `json:"type"`
 	Region           string            `json:"regionId"`
 	Zone             string            `json:"zoneId"`
@@ -139,7 +139,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		return nil, status.Errorf(codes.OutOfRange, "CreateVolume: invalid capacity range: %v", err)
 	}
 
-	diskVol, err := getDiskVolumeOptions(req)
+	volArg, err := getVolumeOptions(req)
 	if err != nil {
 		klog.Errorf("CreateVolume: error parameters from input: %v, with error: %v", req.Name, err)
 		return nil, status.Errorf(codes.InvalidArgument, "CreateVolume: Invalid parameters from input: %v, with error: %v", req.Name, err)
@@ -222,9 +222,9 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 			klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", zone))
 		}
 	}
-	diskVol.Zone = zone
+	volArg.Zone = zone
 
-	createVolumeReq, diskType, err := createDisk(req.GetName(), size, diskVol, parameters)
+	createVolumeReq, diskType, err := preCreateVolume(req.GetName(), size, volArg, parameters)
 
 	purchaseTime, err := strconv.Atoi(parameters.Get("purchasetime", defaultPurchaseTime))
 	if err != nil {
@@ -234,6 +234,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		createVolumeReq.PurchaseTime = purchaseTime
 	}
 
+	//Read the information in storageclasses and use it to create ebs volume
 	volumeContext := req.GetParameters()
 	if volumeContext == nil {
 		volumeContext = make(map[string]string)
@@ -262,22 +263,22 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		}
 	}
 
-	tmpVol := volumeCreate(diskType, createVolumeResp.VolumeId, size, volumeContext, diskVol.Zone)
+	tmpVol := getCsiVolumeInfo(diskType, createVolumeResp.VolumeId, size, volumeContext, volArg.Zone)
 
 	return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
 }
 
-func createDisk(diskName string, size int64, diskVol *diskVolumeArgs, parameters SuperMapString) (*ebsClient.CreateVolumeReq, string, error) {
-	createDiskRequest := &ebsClient.CreateVolumeReq{}
-	createDiskRequest.VolumeName = diskName
-	createDiskRequest.Size = size / GB
-	createDiskRequest.AvailabilityZone = diskVol.Zone
-	createDiskRequest.VolumeDesc = createdByDO
-	createDiskRequest.Tags = diskVol.DiskTags
-	createDiskRequest.ChargeType = parameters.Get("chargetype", defaultChargeType)
-	createDiskRequest.ProjectId = parameters.Get("projectid", "")
+func preCreateVolume(diskName string, size int64, volArg *volumeArgs, parameters SuperMapString) (*ebsClient.CreateVolumeReq, string, error) {
+	createVolumeRequest := &ebsClient.CreateVolumeReq{}
+	createVolumeRequest.VolumeName = diskName
+	createVolumeRequest.Size = size / GB
+	createVolumeRequest.AvailabilityZone = volArg.Zone
+	createVolumeRequest.VolumeDesc = createdByDO
+	createVolumeRequest.Tags = volArg.DiskTags
+	createVolumeRequest.ChargeType = parameters.Get("chargetype", defaultChargeType)
+	createVolumeRequest.ProjectId = parameters.Get("projectid", "")
 
-	diskTypes, diskPLs, err := getDiskType(diskVol)
+	diskTypes, diskPLs, err := getDiskType(volArg)
 	klog.V(5).Infof("createDisk: diskName: %s, valid disktype: %v, valid diskpls: %v", diskName, diskTypes, diskPLs)
 	if err != nil {
 		return nil, "", err
@@ -285,18 +286,21 @@ func createDisk(diskName string, size int64, diskVol *diskVolumeArgs, parameters
 
 	// TODO:支持多diskTypes
 	for _, dType := range diskTypes {
-		createDiskRequest.VolumeType = dType
-		return createDiskRequest, dType, nil
+		createVolumeRequest.VolumeType = dType
+		return createVolumeRequest, dType, nil
 	}
 
-	return nil, "", status.Errorf(codes.Internal, "createDisk: err: %v, the zone:[%s] is not support specific disk type, please change the request disktype: %s or disk pl: %s", err, diskVol.Zone, diskTypes, diskPLs)
+	return nil, "", status.Errorf(codes.Internal, "createDisk: err: %v, the zone:[%s] is not support specific disk type, please change the request disktype: %s or disk pl: %s", err, volArg.Zone, diskTypes, diskPLs)
 }
 
-func getDiskType(diskVol *diskVolumeArgs) ([]string, []string, error) {
+func getDiskType(volArg *volumeArgs) ([]string, []string, error) {
 	nodeSupportDiskType := []string{}
-	if diskVol.NodeSelected != "" {
+	if volArg.NodeSelected != "" {
 		client := GlobalConfigVar.K8sClient
-		nodeInfo, err := client.CoreV1().Nodes().Get(context.Background(), diskVol.NodeSelected, metav1.GetOptions{})
+		nodeInfo, err := client.CoreV1().Nodes().Get(context.Background(), volArg.NodeSelected, metav1.GetOptions{})
+		//If the nodeinfo is obtained normally,
+		//obtain the Label and verify the matching value between the node and the hard disk.
+		//If the acquisition fails, skip the verification and follow the immediate binding process.
 		if err != nil {
 			klog.Errorf("getDiskType: failed to get node labels: %v", err)
 			goto cusDiskType
@@ -307,24 +311,24 @@ func getDiskType(diskVol *diskVolumeArgs) ([]string, []string, error) {
 				nodeSupportDiskType = append(nodeSupportDiskType, result[1])
 			}
 		}
-		klog.V(5).Infof("CreateVolume:: node support disk types: %v, nodeSelected: %v", nodeSupportDiskType, diskVol.NodeSelected)
+		klog.V(5).Infof("CreateVolume:: node support disk types: %v, nodeSelected: %v", nodeSupportDiskType, volArg.NodeSelected)
 	}
 cusDiskType:
 	provisionPerformanceLevel := []string{}
-	if diskVol.PerformanceLevel != "" {
-		provisionPerformanceLevel = strings.Split(diskVol.PerformanceLevel, ",")
+	if volArg.PerformanceLevel != "" {
+		provisionPerformanceLevel = strings.Split(volArg.PerformanceLevel, ",")
 	}
 	provisionDiskTypes := []string{}
-	allTypes := deleteEmpty(strings.Split(diskVol.Type, ","))
+	allTypes := deleteEmpty(strings.Split(volArg.Type, ","))
 	for arr, disktype := range allTypes {
-		if disktype == "ESSD" && provisionDiskTypes != nil {
-			allTypes[arr] = allTypes[arr] + provisionDiskTypes[0]
+		if disktype == "ESSD" && provisionPerformanceLevel != nil {
+			allTypes[arr] = allTypes[arr] + provisionPerformanceLevel[0]
 		}
 	}
 	if len(nodeSupportDiskType) != 0 {
 		provisionDiskTypes = intersect(nodeSupportDiskType, allTypes)
 		if len(provisionDiskTypes) == 0 {
-			klog.Errorf("CreateVolume:: node(%s) support type: [%v] is incompatible with provision disk type: [%s]", diskVol.NodeSelected, nodeSupportDiskType, allTypes)
+			klog.Errorf("CreateVolume:: node(%s) support type: [%v] is incompatible with provision disk type: [%s]", volArg.NodeSelected, nodeSupportDiskType, allTypes)
 			//return nil, nil, status.Errorf(codes.InvalidArgument, "CreateVolume:: node support type: [%v] is incompatible with provision disk type: [%s]", nodeSupportDiskType, allTypes)
 			if allTypes != nil {
 				provisionDiskTypes = append(provisionDiskTypes, allTypes[0])
