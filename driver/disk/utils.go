@@ -514,7 +514,7 @@ func intersect(slice1, slice2 []string) []string {
 	return nn
 }
 
-func UpdateNode(nodes core_v1.NodeInterface) {
+func UpdateNode(nodes core_v1.NodeInterface, instanceID string) {
 	ctx, cancel := context.WithTimeout(context.Background(), UpdateNodeTimeout)
 	defer cancel()
 	nodeName := os.Getenv(KubeNodeName)
@@ -526,7 +526,10 @@ func UpdateNode(nodes core_v1.NodeInterface) {
 	//zone := nodeInfo.Labels[NodeZoneKey]
 
 	if instanceType == "" {
-		instanceType, err = GetInstanceType(nodeInfo.Annotations[InstanceUuid])
+		//There will be a certain delay in obtaining the instance ID using annotations,
+		//resulting in failure to obtain the instance model.
+		//instanceID := nodeInfo.Annotations[InstanceUuid]
+		instanceType, err = GetInstanceType(instanceID)
 		if err != nil {
 			return
 		}
@@ -628,6 +631,7 @@ func GetInstanceType(InstanceId string) (InstanceType string, err error) {
 
 	resp, err := cli.DoRequest("kec", "Action=DescribeInstances", payload)
 	if err != nil {
+		klog.Errorf("GetInstanceType::payload is %v, err is %v", payload, err)
 		return "", err
 	}
 

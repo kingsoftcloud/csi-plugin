@@ -48,5 +48,6 @@ const (
 	// KceLabel zone ....
 	KceLabelZoneKey = "kce/kec-zone"
 
-	InstanceUuid = "appengine.sdns.ksyun.com/instance-uuid"
+	InstanceUuid           = "appengine.sdns.ksyun.com/instance-uuid"
+	NodeAnnotationNodeType = "appengine.sdns.ksyun.com/node-type"
 )

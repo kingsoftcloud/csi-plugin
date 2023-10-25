@@ -63,7 +63,7 @@ func GetNodeServer(cfg *Config) *NodeServer {
 	if err != nil {
 		panic(err)
 	}
-	go UpdateNode(GlobalConfigVar.K8sClient.CoreV1().Nodes())
+	go UpdateNode(GlobalConfigVar.K8sClient.CoreV1().Nodes(), instanceUUID)
 	nodeServer.region = node.Labels[util.NodeRegionKey]
 	nodeServer.zone = node.Labels[util.NodeZoneKey]
 
