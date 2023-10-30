@@ -206,23 +206,22 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	parameters := SuperMapString(req.Parameters)
 
 	//var region string
-	zone := parameters.Get("zone", "")
+	volArg.Zone = parameters.Get("zone", "")
 	isZoneSpecified := true
-	if len(zone) == 0 {
+	if len(volArg.Zone) == 0 {
 		isZoneSpecified = false
 		if len(req.AccessibilityRequirements.Preferred) != 0 {
 			// choose the most preffer zone
 			segments := req.AccessibilityRequirements.Preferred[0]
-			zone = segments.Segments[util.NodeZoneKey]
+			volArg.Zone = segments.Segments[util.NodeZoneKey]
 		} else {
-			_, zone, err = cs.k8sClient.GetNodeRegionZone()
+			_, volArg.Zone, err = cs.k8sClient.GetNodeRegionZone()
 			if err != nil {
 				return nil, err
 			}
-			klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", zone))
+			klog.V(5).Info(fmt.Sprintf("rand region and zone: %s, %s", "", volArg.Zone))
 		}
 	}
-	volArg.Zone = zone
 
 	createVolumeReq, diskType, err := preCreateVolume(req.GetName(), size, volArg, parameters)
 
@@ -250,7 +249,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		if !isZoneSpecified {
 			segments := req.AccessibilityRequirements.Preferred[i]
 			createVolumeReq.AvailabilityZone = segments.Segments[util.NodeZoneKey]
-			zone = createVolumeReq.AvailabilityZone
+			volArg.Zone = createVolumeReq.AvailabilityZone
 		}
 		createVolumeResp, err = cs.ebsClient.CreateVolume(createVolumeReq)
 		// if createVolume success
