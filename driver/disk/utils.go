@@ -14,6 +14,7 @@ import (
 	"k8s.io/klog"
 	"math/rand"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -40,11 +41,11 @@ const (
 
 	// minimumVolumeSizeInBytes is used to validate that the user is not trying
 	// to create a volume that is smaller than what we support
-	minimumVolumeSizeInBytes int64 = 1 * GB
+	minimumVolumeSizeInBytes int64 = 10 * GB
 
 	// maximumVolumeSizeInBytes is used to validate that the user is not trying
 	// to create a volume that is larger than what we support
-	maximumVolumeSizeInBytes int64 = 16 * TB
+	maximumVolumeSizeInBytes int64 = 32 * TB
 
 	// defaultVolumeSizeInBytes is used when the user did not provide a size or
 	// the size they provided did not satisfy our requirements
@@ -385,13 +386,25 @@ func getVolumeOptions(req *csi.CreateVolumeRequest) (*volumeArgs, error) {
 	// diskTags
 	diskTags, ok := volOptions["tags"]
 	if ok {
+		keyRegex := regexp.MustCompile("[^a-zA-Z0-9\u4e00-\u9fa5=._/@]")
+		valueRegex := regexp.MustCompile("[^a-zA-Z0-9\u4e00-\u9fa5=._/@(){}]")
+
 		for _, tag := range strings.Split(diskTags, ",") {
 			k, v, found := strings.Cut(tag, ":")
 			if !found {
 				return nil, status.Errorf(codes.InvalidArgument, "Invalid diskTags format name: %s tags: %s", req.GetName(), diskTags)
 			}
+			if k == "" || v == "" {
+				return nil, status.Errorf(codes.InvalidArgument, "key or value is nil，key: %s value: %s", k, v)
+			}
+			if keyRegex.MatchString(k) || valueRegex.MatchString(v) {
+				return nil, status.Errorf(codes.InvalidArgument, "key or value contains unsupported characters, key: %s value: %s", k, v)
+			}
 			volArgArgs.DiskTags[k] = v
 		}
+	}
+	if len(volArgArgs.DiskTags) > 5 {
+		return nil, errors.New("the number of labels cannot exceed 5")
 	}
 	//TODO: 将PV信息作为diskTags
 

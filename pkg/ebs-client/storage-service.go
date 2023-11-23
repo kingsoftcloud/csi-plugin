@@ -42,8 +42,8 @@ const (
 
 	// volume size
 	// 单位 GB
-	MIN_VOLUME_SIZE int64 = 1
-	MAX_VOLUME_SIZE int64 = 16000
+	MIN_VOLUME_SIZE int64 = 10
+	MAX_VOLUME_SIZE int64 = 32000
 
 	// charge type
 	MONTHLY_CHARGE_TYPE                   string = "Monthly"

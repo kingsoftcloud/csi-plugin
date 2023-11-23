@@ -1,0 +1,12 @@
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: tag
+parameters:
+  chargetype: Daily
+  type: SSD3.0
+  tags: "±=._/@:±=._/@(){}"
+provisioner: com.ksc.csi.diskplugin
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
