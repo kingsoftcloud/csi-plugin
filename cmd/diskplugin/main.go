@@ -40,7 +40,7 @@ var (
 	nodeServer       = flag.Bool("node-server", false, "value: node-server=true|false")
 
 	volumeExpansion = flag.Bool("node-expand-required", true, "Enables NodeServiceCapability_RPC_EXPAND_VOLUME capacity.")
-	maxVolumeSize   = flag.Int64("max-volume-size", 16000, "maximum size of volumes in GB (inclusive)")
+	maxVolumeSize   = flag.Int64("max-volume-size", 32000, "maximum size of volumes in GB (inclusive)")
 
 	accessKeyId     = flag.String("access-key-id", "", "")
 	accessKeySecret = flag.String("access-key-secret", "", "")
