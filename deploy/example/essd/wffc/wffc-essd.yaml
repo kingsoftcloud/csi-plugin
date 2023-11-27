@@ -1,3 +1,29 @@
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: wffc-essd
+parameters:
+  chargetype: Daily
+  type: SSD3.0
+#  zone: cn-beijing-6a
+provisioner: com.ksc.csi.diskplugin
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wffc-essd
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: wffc-essd
+  resources:
+    requests:
+      storage: 40Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:

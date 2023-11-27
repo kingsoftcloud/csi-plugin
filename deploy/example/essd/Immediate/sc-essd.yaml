@@ -1,3 +1,29 @@
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: essd
+parameters:
+  chargetype: Daily
+  type: ESSD_PL0
+#  zone: cn-beijing-6e
+provisioner: com.ksc.csi.diskplugin
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: essd
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: essd
+  resources:
+    requests:
+      storage: 40Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,4 +51,3 @@ spec:
         - name: essd
           persistentVolumeClaim:
             claimName: essd
-

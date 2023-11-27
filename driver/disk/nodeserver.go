@@ -45,8 +45,14 @@ func GetNodeServer(cfg *Config) *NodeServer {
 		panic(errors.New("nodename is empty"))
 	}
 
-	// get node instance_uuid
+	// Get whether node is a physical machine
 	instanceUUID, err := util.GetSystemUUID()
+	if err != nil {
+		panic(err)
+	}
+
+	// get node instanceType
+	isPhysical, err := util.IsPhysical()
 	if err != nil {
 		panic(err)
 	}
@@ -63,7 +69,15 @@ func GetNodeServer(cfg *Config) *NodeServer {
 	if err != nil {
 		panic(err)
 	}
-	go UpdateNode(GlobalConfigVar.K8sClient.CoreV1().Nodes(), instanceUUID)
+
+	//If it is a physical machine, skip the labeling step
+	if isPhysical {
+		klog.V(5).Info("This instance is Physical")
+	} else {
+		klog.V(5).Info("This instance is VM")
+		go UpdateNode(GlobalConfigVar.K8sClient.CoreV1().Nodes(), instanceUUID)
+	}
+
 	nodeServer.region = node.Labels[util.NodeRegionKey]
 	nodeServer.zone = node.Labels[util.NodeZoneKey]
 
@@ -394,8 +408,15 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 		d.zone = node.Labels[util.NodeZoneKey]
 	}
 
-	//TODO 待支持
 	maxVolumesPerNode := d.config.MaxVolumesPerNode
+	//TODO 待支持
+	if isPhysical, _ := util.IsPhysical(); isPhysical {
+		// If value is not set or zero CO SHALL decide how many volumes of
+		// this type can be published by the controller to the node. The
+		// plugin MUST NOT set negative values here.
+		maxVolumesPerNode = 1
+	}
+
 	// instanceinfo, err := d.config.EbsClient.ValidateAttachInstance(&ebsClient.ValidateAttachInstanceReq{
 	// 	//VolumeType: vol.VolumeType,
 	// 	InstanceId: d.nodeID,
