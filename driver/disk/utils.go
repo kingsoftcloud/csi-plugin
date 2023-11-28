@@ -691,8 +691,8 @@ func GetVolumeInfo(VolumeId string) (VolumeType string, err error) {
 	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
 	VolumesInfoResp := &VolumesInfoResp{}
 
-	query := "Action=DescribeVolumes&" + VolumeId
-	resp, err := cli.DoRequest("kec", query)
+	payloads := fmt.Sprintf("VolumeId.1=%v", VolumeId)
+	resp, err := cli.DoRequest("ebs", "Action=DescribeVolumes", payloads)
 	if err != nil {
 		return "", err
 	}
