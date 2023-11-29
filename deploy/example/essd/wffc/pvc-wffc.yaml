@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wffc-ehdd
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: wffc
+  resources:
+    requests:
+      storage: 20Gi

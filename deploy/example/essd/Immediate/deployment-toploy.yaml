@@ -1,0 +1,47 @@
+---
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  labels:
+    ksyun-app: "csi-wffc-test"
+  name: "csi-wffc-test"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      ksyun-app: "csi-wffc-test"
+  template:
+    metadata:
+      labels:
+        ksyun-app: "csi-wffc-test"
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: "failure-domain.beta.kubernetes.io/zone"
+                    operator: "In"
+                    values:
+#                      - "cn-beijing-6a"
+                      - "cn-beijing-6c"
+                      - "cn-beijing-6e"
+      containers:
+        - image: "hub.kce.ksyun.com/yimenghua/nginx:latest"
+          imagePullPolicy: "Always"
+          name: "csi-test"
+          resources: {}
+          securityContext:
+            privileged: false
+          terminationMessagePath: "/dev/termination-log"
+          terminationMessagePolicy: "File"
+          volumeMounts:
+            - name: wffc
+              mountPath: /usr/share/nginx/html
+      dnsPolicy: "ClusterFirst"
+      restartPolicy: "Always"
+      schedulerName: "default-scheduler"
+      volumes:
+        - name: wffc
+          persistentVolumeClaim:
+            claimName: wffc

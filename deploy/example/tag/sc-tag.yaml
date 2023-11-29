@@ -6,7 +6,7 @@ metadata:
 parameters:
   chargetype: Daily
   type: SSD3.0
-  tags: "±=._/@:±=._/@(){}"
+  tags: "key1:value1,key2:value2,key3:value3,key4:value4"
 provisioner: com.ksc.csi.diskplugin
 reclaimPolicy: Delete
 volumeBindingMode: Immediate

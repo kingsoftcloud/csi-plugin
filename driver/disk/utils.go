@@ -45,7 +45,7 @@ const (
 
 	// maximumVolumeSizeInBytes is used to validate that the user is not trying
 	// to create a volume that is larger than what we support
-	maximumVolumeSizeInBytes int64 = 32 * TB
+	maximumVolumeSizeInBytes int64 = 32000 * GB
 
 	// defaultVolumeSizeInBytes is used when the user did not provide a size or
 	// the size they provided did not satisfy our requirements
@@ -394,6 +394,9 @@ func getVolumeOptions(req *csi.CreateVolumeRequest) (*volumeArgs, error) {
 			if !found {
 				return nil, status.Errorf(codes.InvalidArgument, "Invalid diskTags format name: %s tags: %s", req.GetName(), diskTags)
 			}
+			if len(k) > 128 || len(v) > 256 {
+				return nil, status.Errorf(codes.InvalidArgument, "key or value length exceeds the limit，key: %s value: %s", k, v)
+			}
 			if k == "" || v == "" {
 				return nil, status.Errorf(codes.InvalidArgument, "key or value is nil，key: %s value: %s", k, v)
 			}
@@ -688,8 +691,8 @@ func GetVolumeInfo(VolumeId string) (VolumeType string, err error) {
 	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
 	VolumesInfoResp := &VolumesInfoResp{}
 
-	query := "Action=DescribeVolumes&" + VolumeId
-	resp, err := cli.DoRequest("kec", query)
+	payloads := fmt.Sprintf("VolumeId.1=%v", VolumeId)
+	resp, err := cli.DoRequest("ebs", "Action=DescribeVolumes", payloads)
 	if err != nil {
 		return "", err
 	}
