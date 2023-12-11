@@ -23,8 +23,6 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require github.com/kingsoftcloud/sdk-go v1.3.1
-
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect

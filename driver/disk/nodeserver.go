@@ -1,6 +1,7 @@
 package driver
 
 import (
+	ebsClient "csi-plugin/pkg/ebs-client"
 	"errors"
 	"fmt"
 	"os"
@@ -409,7 +410,32 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 	}
 
 	maxVolumesPerNode := d.config.MaxVolumesPerNode
-	//TODO 待支持
+
+	instanceInfo, err := d.config.EbsClient.DescribeInstanceVolumes(&ebsClient.DescribeInstanceVolumesReq{
+		InstanceId: d.nodeID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// The disk bound to the node is not created by CSI
+	count := len(instanceInfo.Attachments)
+	for _, instance := range instanceInfo.Attachments {
+		volume, err := d.config.EbsClient.GetVolume(&ebsClient.ListVolumesReq{VolumeIds: []string{instance.VolumeId}})
+		if err != nil {
+			klog.Warning("volume %s not found ,err: %v", instance.VolumeId, err)
+			// The problem is from ebs
+			return nil, err
+		}
+		if volume.VolumeDesc == createdByDO || volume.VolumeCategory == "system" {
+			count--
+		}
+	}
+
+	if maxVolumesPerNode-int64(count) > 0 {
+		maxVolumesPerNode = maxVolumesPerNode - int64(count)
+	}
+
 	if isPhysical, _ := util.IsPhysical(); isPhysical {
 		// If value is not set or zero CO SHALL decide how many volumes of
 		// this type can be published by the controller to the node. The
@@ -417,16 +443,6 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 		maxVolumesPerNode = 1
 	}
 
-	// instanceinfo, err := d.config.EbsClient.ValidateAttachInstance(&ebsClient.ValidateAttachInstanceReq{
-	// 	//VolumeType: vol.VolumeType,
-	// 	InstanceId: d.nodeID,
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if maxVolumesPerNode < int64(instanceinfo.LargeVolumeSupport) {
-	// 	maxVolumesPerNode = int64(instanceinfo.LargeVolumeSupport)
-	// }
 	resp := &csi.NodeGetInfoResponse{
 		NodeId: d.nodeID,
 		//refer to  https://docs.ksyun.com/documents/5423 "单实例云硬盘数量"

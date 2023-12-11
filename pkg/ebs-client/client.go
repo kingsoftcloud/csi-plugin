@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	//	"strconv"
 	"time"
 
@@ -25,6 +24,19 @@ const (
 
 type Client struct {
 	*api.Client
+}
+
+func (cli *Client) DescribeInstanceVolumes(describeInstanceVolumesReq *DescribeInstanceVolumesReq) (*InstanceVolumes, error) {
+	ValidateAttachInstanceResp := &InstanceVolumes{}
+	query := describeInstanceVolumesReq.ToQuery()
+	resp, err := cli.DoRequest(serviceName, query)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(resp, ValidateAttachInstanceResp); err != nil {
+		return nil, err
+	}
+	return ValidateAttachInstanceResp, nil
 }
 
 func New(config *api.ClientConfig) *Client {

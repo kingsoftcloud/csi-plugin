@@ -19,6 +19,7 @@ type StorageService interface {
 
 	ValidateAttachInstance(*ValidateAttachInstanceReq) (*ValidateAttachInstanceResp, error)
 	GetVolumeByName(getVolumesReq *ListVolumesReq) (*ListVolumesResp, error)
+	DescribeInstanceVolumes(describeInstanceVolumesReq *DescribeInstanceVolumesReq) (*InstanceVolumes, error)
 }
 
 type VolumeStatusType string
@@ -65,6 +66,11 @@ const (
 	ERROR_STATUS     VolumeStatusType = "error"
 )
 
+type InstanceVolumes struct {
+	RequestId   string        `json:"RequestId"`
+	Attachments []*Attachment `json:"Attachments"`
+}
+
 type Volume struct {
 	VolumeId           string           `json:"VolumeId"`
 	VolumeName         string           `json:"VolumeName"`
@@ -83,6 +89,7 @@ type Volume struct {
 
 type Attachment struct {
 	InstanceId string `json:"InstanceId"`
+	VolumeId   string `json:"VolumeId"`
 	MountPoint string `json:"MountPoint"`
 }
 
@@ -325,4 +332,16 @@ type ValidateAttachInstanceResp struct {
 	InstanceState      string `json:"InstanceState"`
 	LargeVolumeSupport bool   `json:"LargeVolumeSupport"`
 	AvailableVolumeNum int    `json:"AvailableVolumeNum"`
+}
+
+type DescribeInstanceVolumesReq struct {
+	InstanceId string
+}
+
+func (va *DescribeInstanceVolumesReq) ToQuery() string {
+	querySlice := []string{"Action=DescribeInstanceVolumes"}
+	if va.InstanceId != "" {
+		querySlice = append(querySlice, fmt.Sprintf("InstanceId=%v", va.InstanceId))
+	}
+	return strings.Join(querySlice, Separator)
 }
