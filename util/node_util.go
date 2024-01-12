@@ -94,8 +94,9 @@ func IsPhysical() (bool, error) {
 		return false, fmt.Errorf("not found file %s", path.Join(dmiDir, "id", "product_name"))
 	}
 
+	vmFlag := strings.ToLower(strings.TrimSpace(string(vmName)))
 	for _, v := range VMS {
-		if strings.ToLower(strings.TrimSpace(string(vmName))) == v {
+		if strings.Contains(vmFlag, v) {
 			return false, nil
 		}
 	}
