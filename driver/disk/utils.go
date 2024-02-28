@@ -706,3 +706,31 @@ func GetVolumeInfo(VolumeId string) (VolumeType string, err error) {
 
 	return VolumeType, nil
 }
+
+func getVolumeCount(instanceID string) (int64, error) {
+	var availableVolumeCount int
+	instanceType, err := GetInstanceType(instanceID)
+	if err != nil {
+		return DefaultMaxVolumesPerNode, err
+	}
+
+	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
+	DescribeInstanceTypeConfigsResp := &DescribeInstanceTypeConfigsResp{}
+	payloads := fmt.Sprintf("Filter.1.Name.1=instance-type&Filter.1.Value.1=%s", instanceType)
+
+	resp, err := cli.DoRequest("kec", "Action=DescribeInstanceTypeConfigs", payloads)
+	if err != nil {
+		return DefaultMaxVolumesPerNode, err
+	}
+
+	err = json.Unmarshal(resp, &DescribeInstanceTypeConfigsResp)
+	if err != nil {
+		klog.Error("Error decoding json: ", err)
+		return DefaultMaxVolumesPerNode, err
+	}
+	InstanceTypeConfigSet := DescribeInstanceTypeConfigsResp.InstanceTypeConfigSet
+	DataDiskQuotaSet := InstanceTypeConfigSet[0].DataDiskQuotaSet
+
+	availableVolumeCount = DataDiskQuotaSet[0].DataDiskCount
+	return int64(availableVolumeCount), nil
+}

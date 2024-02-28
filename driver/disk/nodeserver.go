@@ -23,20 +23,22 @@ import (
 )
 
 const (
-	diskIDPath = "/dev/disk/by-id"
-	diskPrefix = "virtio-"
-	EssdPrefix = "virtio-volume-"
+	diskIDPath               = "/dev/disk/by-id"
+	diskPrefix               = "virtio-"
+	EssdPrefix               = "virtio-volume-"
+	DefaultMaxVolumesPerNode = 8
 )
 
 type NodeServer struct {
 	config Config
 
 	sync.Mutex
-	nodeName string
-	nodeID   string
-	region   string
-	zone     string
-	mounter  Mounter
+	nodeName          string
+	nodeID            string
+	region            string
+	zone              string
+	maxVolumesPerNode int64
+	mounter           Mounter
 }
 
 // GetNodeServer create node server
@@ -58,11 +60,17 @@ func GetNodeServer(cfg *Config) *NodeServer {
 		panic(err)
 	}
 
+	maxVolumesNum, err := getVolumeCount(instanceUUID)
+	if err != nil {
+		maxVolumesNum = DefaultMaxVolumesPerNode
+		klog.Error(err)
+	}
 	nodeServer := &NodeServer{
-		config:   *cfg,
-		nodeName: nodeName,
-		nodeID:   instanceUUID,
-		mounter:  newMounter(),
+		config:            *cfg,
+		nodeName:          nodeName,
+		nodeID:            instanceUUID,
+		mounter:           newMounter(),
+		maxVolumesPerNode: maxVolumesNum,
 	}
 
 	k8sCli := cfg.K8sClient
@@ -409,8 +417,7 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 		d.zone = node.Labels[util.NodeZoneKey]
 	}
 
-	maxVolumesPerNode := d.config.MaxVolumesPerNode
-
+	maxVolumesPerNode := d.maxVolumesPerNode
 	instanceInfo, err := d.config.EbsClient.DescribeInstanceVolumes(&ebsClient.DescribeInstanceVolumesReq{
 		InstanceId: d.nodeID,
 	})
@@ -432,7 +439,7 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 		}
 	}
 
-	if maxVolumesPerNode-int64(count) > 0 {
+	if maxVolumesPerNode-int64(count) >= 0 {
 		maxVolumesPerNode = maxVolumesPerNode - int64(count)
 	}
 
@@ -440,23 +447,42 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 		// If value is not set or zero CO SHALL decide how many volumes of
 		// this type can be published by the controller to the node. The
 		// plugin MUST NOT set negative values here.
-		maxVolumesPerNode = 1
+		maxVolumesPerNode = 0
 	}
 
-	resp := &csi.NodeGetInfoResponse{
-		NodeId: d.nodeID,
-		//refer to  https://docs.ksyun.com/documents/5423 "单实例云硬盘数量"
+	resp := &csi.NodeGetInfoResponse{}
+	if maxVolumesPerNode != 0 {
+		resp = &csi.NodeGetInfoResponse{
+			NodeId: d.nodeID,
+			//refer to  https://docs.ksyun.com/documents/5423 "单实例云硬盘数量"
 
-		MaxVolumesPerNode: maxVolumesPerNode,
-		// make sure that the driver works on this particular region only
-		AccessibleTopology: &csi.Topology{
-			Segments: map[string]string{
-				// kubelet patch node resources  .metadata.label Forbiden  "failure-domain.beta.kubernetes.io/region"
-				util.NodeRegionKey: d.region,
-				util.NodeZoneKey:   d.zone,
+			MaxVolumesPerNode: maxVolumesPerNode,
+			// make sure that the driver works on this particular region only
+			AccessibleTopology: &csi.Topology{
+				Segments: map[string]string{
+					// kubelet patch node resources  .metadata.label Forbiden  "failure-domain.beta.kubernetes.io/region"
+					util.NodeRegionKey: d.region,
+					util.NodeZoneKey:   d.zone,
+				},
 			},
-		},
+		}
+	} else {
+		resp = &csi.NodeGetInfoResponse{
+			NodeId:            d.nodeID,
+			MaxVolumesPerNode: 1,
+			// make sure that the driver works on this particular region only
+			AccessibleTopology: &csi.Topology{
+				Segments: map[string]string{
+					//The number of cloud hard disks that can be mounted on the node is full,
+					//making the hard disk unable to match the corresponding node.
+					// kubelet patch node resources  .metadata.label Forbiden  "failure-domain.beta.kubernetes.io/region"
+					util.NodeRegionKey: "Insufficient-quantity",
+					util.NodeZoneKey:   "Insufficient-quantity",
+				},
+			},
+		}
 	}
+
 	return resp, nil
 }
 
