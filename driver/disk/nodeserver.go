@@ -4,18 +4,17 @@ import (
 	ebsClient "csi-plugin/pkg/ebs-client"
 	"errors"
 	"fmt"
+	"github.com/container-storage-interface/spec/lib/go/csi"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"k8s.io/klog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sync"
 	"time"
-
-	"github.com/container-storage-interface/spec/lib/go/csi"
-	"golang.org/x/net/context"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"k8s.io/klog"
 
 	"csi-plugin/util"
 
@@ -123,9 +122,10 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 	ok, err := mountutils.PathExists(source)
 	if err != nil || !ok {
 		exec.Command("udevadm", "trigger")
+
+		//Introduce a delay to allow the file system to update its status
+		time.Sleep(3 * time.Second)
 	}
-	//Introduce a delay to allow the file system to update its status
-	time.Sleep(3 * time.Second)
 
 	ok, err = mountutils.PathExists(source)
 	if err != nil || !ok {
