@@ -5,8 +5,8 @@ metadata:
 provisioner: com.ksc.csi.nfsplugin
 allowVolumeExpansion: false
 parameters:
-  server: 12.0.1.33
-  share: /cfs-tvkJyOFspu
+  server:
+  share:
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
 mountOptions:

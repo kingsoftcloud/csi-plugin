@@ -2,7 +2,7 @@ FROM hub.kce.ksyun.com/tekton/alpine-ca-certificates
 #FROM hub.kce.ksyun.com/tekton/amd64/alpine:3.10.3
 #FROM hub.kce.ksyun.com/tekton/alpine:3.9
 
-LABEL maintainers="gaohong1@kingsoft.com"
+LABEL maintainers="ksyun"
 
 #RUN sed -i 's/http\:\/\/dl-cdn.alpinelinux.org/https\:\/\/mirrors.ustc.edu.cn/g' /etc/apk/repositories
 RUN sed -i 's/http\:\/\/dl-cdn.alpinelinux.org/https\:\/\/mirrors.aliyun.com/g' /etc/apk/repositories
@@ -14,6 +14,7 @@ RUN apk update && apk upgrade && \
     apk -U add ca-certificates && \
     #apk add cloud-utils-growpart && \
     apk add util-linux && \
+    apk add eudev && \
     update-ca-certificates
 COPY bin/csi-diskplugin /csi-diskplugin
 
