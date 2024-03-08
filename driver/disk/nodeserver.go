@@ -459,37 +459,19 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 		maxVolumesPerNode = 0
 	}
 
-	resp := &csi.NodeGetInfoResponse{}
-	if maxVolumesPerNode != 0 {
-		resp = &csi.NodeGetInfoResponse{
-			NodeId: d.nodeID,
-			//refer to  https://docs.ksyun.com/documents/5423 "单实例云硬盘数量"
+	resp := &csi.NodeGetInfoResponse{
+		NodeId: d.nodeID,
+		//refer to  https://docs.ksyun.com/documents/5423 "单实例云硬盘数量"
 
-			MaxVolumesPerNode: maxVolumesPerNode,
-			// make sure that the driver works on this particular region only
-			AccessibleTopology: &csi.Topology{
-				Segments: map[string]string{
-					// kubelet patch node resources  .metadata.label Forbiden  "failure-domain.beta.kubernetes.io/region"
-					util.NodeRegionKey: d.region,
-					util.NodeZoneKey:   d.zone,
-				},
+		MaxVolumesPerNode: maxVolumesPerNode,
+		// make sure that the driver works on this particular region only
+		AccessibleTopology: &csi.Topology{
+			Segments: map[string]string{
+				// kubelet patch node resources  .metadata.label Forbiden  "failure-domain.beta.kubernetes.io/region"
+				util.NodeRegionKey: d.region,
+				util.NodeZoneKey:   d.zone,
 			},
-		}
-	} else {
-		resp = &csi.NodeGetInfoResponse{
-			NodeId:            d.nodeID,
-			MaxVolumesPerNode: 1,
-			// make sure that the driver works on this particular region only
-			AccessibleTopology: &csi.Topology{
-				Segments: map[string]string{
-					//The number of cloud hard disks that can be mounted on the node is full,
-					//making the hard disk unable to match the corresponding node.
-					// kubelet patch node resources  .metadata.label Forbiden  "failure-domain.beta.kubernetes.io/region"
-					util.NodeRegionKey: "Insufficient-quantity",
-					util.NodeZoneKey:   "Insufficient-quantity",
-				},
-			},
-		}
+		},
 	}
 
 	return resp, nil
