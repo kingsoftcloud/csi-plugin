@@ -13,7 +13,20 @@ volumeBindingMode: Immediate
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: ssd
+  name: ssd1
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ssd
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ssd2
   namespace: default
 spec:
   accessModes:
@@ -44,10 +57,15 @@ spec:
           image: hub.kce.ksyun.com/yimenghua/nginx:latest
           imagePullPolicy: Always
           volumeMounts:
-            - name: ssd
-              mountPath: /usr/share/nginx/html
+            - name: ssd1
+              mountPath: /usr/share/nginx/html1
+            - name: ssd2
+              mountPath: /usr/share/nginx/html2
       volumes:
-        - name: ssd
+        - name: ssd1
           persistentVolumeClaim:
-            claimName: ssd
+            claimName: ssd1
+        - name: ssd2
+          persistentVolumeClaim:
+            claimName: ssd2
 

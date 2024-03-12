@@ -250,6 +250,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 			segments := req.AccessibilityRequirements.Preferred[i]
 			createVolumeReq.AvailabilityZone = segments.Segments[util.NodeZoneKey]
 			volArg.Zone = createVolumeReq.AvailabilityZone
+			klog.V(2).Infof("CreateVolume::Zone be selected for the %d-th time, Zone is %s", i, volArg.Zone)
 		}
 		createVolumeResp, err = cs.ebsClient.CreateVolume(createVolumeReq)
 		// if createVolume success

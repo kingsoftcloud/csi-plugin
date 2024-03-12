@@ -4,16 +4,17 @@ import (
 	ebsClient "csi-plugin/pkg/ebs-client"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"regexp"
-	"sync"
-
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"sync"
+	"time"
 
 	"csi-plugin/util"
 
@@ -23,20 +24,22 @@ import (
 )
 
 const (
-	diskIDPath = "/dev/disk/by-id"
-	diskPrefix = "virtio-"
-	EssdPrefix = "virtio-volume-"
+	diskIDPath               = "/dev/disk/by-id"
+	diskPrefix               = "virtio-"
+	EssdPrefix               = "virtio-volume-"
+	DefaultMaxVolumesPerNode = 8
 )
 
 type NodeServer struct {
 	config Config
 
 	sync.Mutex
-	nodeName string
-	nodeID   string
-	region   string
-	zone     string
-	mounter  Mounter
+	nodeName          string
+	nodeID            string
+	region            string
+	zone              string
+	maxVolumesPerNode int64
+	mounter           Mounter
 }
 
 // GetNodeServer create node server
@@ -58,11 +61,17 @@ func GetNodeServer(cfg *Config) *NodeServer {
 		panic(err)
 	}
 
+	maxVolumesNum, err := getVolumeCount(instanceUUID)
+	if err != nil {
+		maxVolumesNum = DefaultMaxVolumesPerNode
+		klog.Error(err)
+	}
 	nodeServer := &NodeServer{
-		config:   *cfg,
-		nodeName: nodeName,
-		nodeID:   instanceUUID,
-		mounter:  newMounter(),
+		config:            *cfg,
+		nodeName:          nodeName,
+		nodeID:            instanceUUID,
+		mounter:           newMounter(),
+		maxVolumesPerNode: maxVolumesNum,
 	}
 
 	k8sCli := cfg.K8sClient
@@ -111,6 +120,14 @@ func (d *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 	// 判断disk软链接是否生成
 	ok, err := mountutils.PathExists(source)
+	if err != nil || !ok {
+		exec.Command("udevadm", "trigger")
+
+		//Introduce a delay to allow the file system to update its status
+		time.Sleep(3 * time.Second)
+	}
+
+	ok, err = mountutils.PathExists(source)
 	if err != nil || !ok {
 		return nil, status.Errorf(codes.NotFound, "failed to check if path %q exists: %v", source, err)
 	}
@@ -409,8 +426,7 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 		d.zone = node.Labels[util.NodeZoneKey]
 	}
 
-	maxVolumesPerNode := d.config.MaxVolumesPerNode
-
+	maxVolumesPerNode := d.maxVolumesPerNode
 	instanceInfo, err := d.config.EbsClient.DescribeInstanceVolumes(&ebsClient.DescribeInstanceVolumesReq{
 		InstanceId: d.nodeID,
 	})
@@ -432,7 +448,7 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 		}
 	}
 
-	if maxVolumesPerNode-int64(count) > 0 {
+	if maxVolumesPerNode-int64(count) >= 0 {
 		maxVolumesPerNode = maxVolumesPerNode - int64(count)
 	}
 
@@ -440,7 +456,7 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 		// If value is not set or zero CO SHALL decide how many volumes of
 		// this type can be published by the controller to the node. The
 		// plugin MUST NOT set negative values here.
-		maxVolumesPerNode = 1
+		maxVolumesPerNode = 0
 	}
 
 	resp := &csi.NodeGetInfoResponse{
@@ -457,6 +473,7 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 			},
 		},
 	}
+
 	return resp, nil
 }
 

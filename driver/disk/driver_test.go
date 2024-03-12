@@ -82,7 +82,7 @@ type fakeK8sClientWrap struct{}
 func (fk *fakeK8sClientWrap) GetNodeRegionZone() (string, string, error) {
 	return "test-region", "test-zone", nil
 }
-func (fk *fakeK8sClientWrap) IsNodeStatusReady(nodename string) (bool, error){
+func (fk *fakeK8sClientWrap) IsNodeStatusReady(nodename string) (bool, error) {
 	return false, nil
 }
 func getDriver(t *testing.T) *Driver {
@@ -133,6 +133,11 @@ func TestDriverSuite(t *testing.T) {
 
 type FakeStorageClient struct {
 	volumes map[string]*ebsClient.Volume
+}
+
+func (cli *FakeStorageClient) DescribeInstanceVolumes(describeInstanceVolumesReq *ebsClient.DescribeInstanceVolumesReq) (*ebsClient.InstanceVolumes, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func NewFakeStorageClient() *FakeStorageClient {

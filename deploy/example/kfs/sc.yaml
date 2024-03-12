@@ -1,0 +1,16 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: kfsplugin
+provisioner: com.ksc.csi.nfsplugin
+allowVolumeExpansion: false
+parameters:
+  server:
+  share:
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+mountOptions:
+  - vers=3
+  - nolock
+  - proto=tcp
+  - noresvport
