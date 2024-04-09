@@ -656,6 +656,10 @@ func GetInstanceType(InstanceId string) (InstanceType string, err error) {
 		klog.Error("Error decoding json: ", err)
 		return "", err
 	}
+
+	if DescribeInstancesResp.InstanceCount == 0 {
+		return "", fmt.Errorf("this instance was not found,please confirm whether it exists")
+	}
 	InstancesSet := DescribeInstancesResp.InstancesSet
 	InstanceType = InstancesSet[0].InstanceType
 

@@ -1,0 +1,24 @@
+FROM --platform=$BUILDPLATFORM golang:1.19.3-alpine AS build
+ARG TARGETOS TARGETARCH
+RUN mkdir /csi-plugin
+ENV GOPROXY https://goproxy.cn
+COPY . /csi-plugin/
+WORKDIR /csi-plugin
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o ./bin/csi-diskplugin ./cmd/diskplugin
+
+FROM alpine:3.18.4
+#RUN sed -i 's/http\:\/\/dl-cdn.alpinelinux.org/https\:\/\/mirrors.aliyun.com/g' /etc/apk/repositories
+
+RUN apk update && apk upgrade && \
+    apk add e2fsprogs-extra &&\
+    apk add e2fsprogs && apk add blkid && apk add findmnt && \
+    apk add xfsprogs && apk add xfsprogs-extra && \
+    apk add nfs-utils && \
+    apk -U add ca-certificates && \
+    #apk add cloud-utils-growpart && \
+    apk add util-linux && \
+    apk add eudev && \
+    update-ca-certificates
+
+COPY --from=build /csi-plugin/bin/csi-diskplugin /csi-diskplugin
+ENTRYPOINT ["/csi-diskplugin"]
