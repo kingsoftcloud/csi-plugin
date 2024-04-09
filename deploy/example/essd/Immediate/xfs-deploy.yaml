@@ -1,15 +1,15 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: ssd
+  name: xfs
   namespace: default
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: ssd
+  storageClassName: xfs
   resources:
     requests:
-      storage: 20Gi
+      storage: 40Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -27,14 +27,16 @@ spec:
       labels:
         app: ssd
     spec:
+      nodeName: 12.0.3.130
       containers:
         - name: nginx
-          image: nginx:stable-alpine3.17
+          image: hub.kce.ksyun.com/yimenghua/nginx:latest
           imagePullPolicy: Always
           volumeMounts:
-            - name: ssd
+            - name: xfs
               mountPath: /usr/share/nginx/html
       volumes:
-        - name: ssd
+        - name: xfs
           persistentVolumeClaim:
-            claimName: ssd
+            claimName: xfs
+

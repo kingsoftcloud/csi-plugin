@@ -427,43 +427,24 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 	}
 
 	maxVolumesPerNode := d.maxVolumesPerNode
-	instanceInfo, err := d.config.EbsClient.DescribeInstanceVolumes(&ebsClient.DescribeInstanceVolumesReq{
-		InstanceId: d.nodeID,
-	})
+
+	nodeMaxVolumeLimit, err := d.GetMaxVolumesPerNode(maxVolumesPerNode)
 	if err != nil {
-		return nil, err
-	}
-
-	// The disk bound to the node is not created by CSI
-	count := len(instanceInfo.Attachments)
-	for _, instance := range instanceInfo.Attachments {
-		volume, err := d.config.EbsClient.GetVolume(&ebsClient.ListVolumesReq{VolumeIds: []string{instance.VolumeId}})
-		if err != nil {
-			klog.Warning("volume %s not found ,err: %v", instance.VolumeId, err)
-			// The problem is from ebs
-			return nil, err
-		}
-		if volume.VolumeDesc == createdByDO || volume.VolumeCategory == "system" {
-			count--
-		}
-	}
-
-	if maxVolumesPerNode-int64(count) >= 0 {
-		maxVolumesPerNode = maxVolumesPerNode - int64(count)
+		klog.Warning("Failed to query the number of mounted volumes on the node.", err)
 	}
 
 	if isPhysical, _ := util.IsPhysical(); isPhysical {
 		// If value is not set or zero CO SHALL decide how many volumes of
 		// this type can be published by the controller to the node. The
 		// plugin MUST NOT set negative values here.
-		maxVolumesPerNode = 0
+		nodeMaxVolumeLimit = 0
 	}
 
 	resp := &csi.NodeGetInfoResponse{
 		NodeId: d.nodeID,
 		//refer to  https://docs.ksyun.com/documents/5423 "单实例云硬盘数量"
 
-		MaxVolumesPerNode: maxVolumesPerNode,
+		MaxVolumesPerNode: nodeMaxVolumeLimit,
 		// make sure that the driver works on this particular region only
 		AccessibleTopology: &csi.Topology{
 			Segments: map[string]string{
@@ -475,6 +456,35 @@ func (d *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReques
 	}
 
 	return resp, nil
+}
+
+func (d *NodeServer) GetMaxVolumesPerNode(maxVolumesPerNode int64) (int64, error) {
+	instanceInfo, err := d.config.EbsClient.DescribeInstanceVolumes(&ebsClient.DescribeInstanceVolumesReq{
+		InstanceId: d.nodeID,
+	})
+	if err != nil {
+		return DefaultMaxVolumesPerNode, err
+	}
+
+	// The disk bound to the node is not created by CSI
+	count := len(instanceInfo.Attachments)
+	for _, instance := range instanceInfo.Attachments {
+		volume, err := d.config.EbsClient.GetVolume(&ebsClient.ListVolumesReq{VolumeIds: []string{instance.VolumeId}})
+		if err != nil {
+			klog.Warning("volume %s not found ,err: %v", instance.VolumeId, err)
+			// The problem is from ebs
+			return DefaultMaxVolumesPerNode, err
+		}
+		if volume.VolumeDesc == createdByDO || volume.VolumeCategory == "system" {
+			count--
+		}
+	}
+
+	if maxVolumesPerNode-int64(count) >= 0 {
+		maxVolumesPerNode = maxVolumesPerNode - int64(count)
+	}
+
+	return maxVolumesPerNode, nil
 }
 
 // NodeExpandVolume is only implemented so the driver can be used for e2e testing.
