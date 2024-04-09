@@ -1,11 +1,12 @@
 module csi-plugin
 
-go 1.17
+go 1.19
 
 require (
 	github.com/aws/aws-sdk-go v1.44.320
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/golang/protobuf v1.5.2
+	github.com/kingsoftcloud/aksk-provider v1.0.0
 	github.com/kubernetes-csi/csi-lib-utils v0.11.0
 	github.com/kubernetes-csi/csi-test v2.2.0+incompatible
 	github.com/onsi/ginkgo v1.16.5
@@ -17,11 +18,13 @@ require (
 	k8s.io/apimachinery v0.24.2
 	k8s.io/client-go v0.24.2
 	k8s.io/klog v1.0.0
-	k8s.io/kubernetes v1.18.8
+	//k8s.io/kubernetes v1.18.8
 	k8s.io/mount-utils v0.24.4
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	sigs.k8s.io/yaml v1.3.0
 )
+
+require k8s.io/kubernetes v0.0.0-00010101000000-000000000000
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

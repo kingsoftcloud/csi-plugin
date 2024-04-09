@@ -1,7 +1,7 @@
 #host
 #10.69.69.225 hub-t.kce.ksyun.com
 
-VERSION ?= 1.8.9
+VERSION ?= 1.9.1
 
 ARCH ?= amd64
 
@@ -17,12 +17,12 @@ compile:
 	GOOS=linux GOARCH=$(ARCH) CGO_ENABLED=0 go build -o ./bin/csi-diskplugin ./cmd/diskplugin
 
 build: compile
-	docker build -t hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH) -f Dockerfile.$(ARCH) .
+	docker build -t hub-t.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH) -f Dockerfile.$(ARCH) .
 tag: build
-	docker tag hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH) hub-t.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH)
+	docker tag hub-t.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH) hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH)
 push: tag
-    #docker push hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH)
-	docker push hub-t.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH)
+	docker push hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH)
+#	docker push hub-t.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-$(ARCH)
 
 .PHONY: deploy_v0.1.0
 deploy_v0.1.0:
