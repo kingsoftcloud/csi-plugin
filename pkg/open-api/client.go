@@ -119,7 +119,7 @@ func (cli *Client) DoRequest(service string, query string, payloads ...string) (
 	klog.V(5).Infof("AK is: %v, SK is: %v, token is %v", ak, sk, aksk.SecurityToken)
 
 	if len(cli.region) == 0 {
-		cli.region, _ = akskConfig.GetRegion()
+		cli.region = akskConfig.Region
 	}
 	s := v4.Signer{Credentials: credentials.NewStaticCredentials(ak, sk, "")}
 
