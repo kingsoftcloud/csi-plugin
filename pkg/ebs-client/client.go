@@ -81,8 +81,8 @@ func (cli *Client) DeleteVolume(deleteVolumeReq *DeleteVolumeReq) (*DeleteVolume
 			}
 		}
 		var error_resp ErrorResponse
-		if err = json.Unmarshal(resp, &error_resp); err != nil {
-			klog.Error("JSON unmarshal failed:", err)
+		if errs := json.Unmarshal(resp, &error_resp); errs != nil {
+			klog.Error("JSON unmarshal failed:", errs)
 		}
 		if error_resp.Error.Code == clientDeleteVolumeStatus {
 			return deleteVolumeResp, nil
