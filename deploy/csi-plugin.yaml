@@ -1,0 +1,158 @@
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: csi-diskplugin
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: csi-diskplugin
+  template:
+    metadata:
+      labels:
+        app: csi-diskplugin
+        role: csi-do
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: type
+                    operator: NotIn
+                    values:
+                      - virtual-kubelet
+      priorityClassName: system-node-critical
+      serviceAccount: csi-diskplugin-sa
+      hostNetwork: true
+      tolerations:
+        - operator: Exists
+      containers:
+        - args:
+            - --v=5
+            - --csi-address=$(ADDRESS)
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/com.ksc.csi.nfsplugin/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          image: hub.kce.ksyun.com/ksyun/csi-node-driver-registrar:v2.2.0-mp
+          imagePullPolicy: IfNotPresent
+          name: nfs-driver-registrar
+          resources:
+            limits:
+              cpu: 200m
+              memory: 400Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          volumeMounts:
+            - mountPath: /csi
+              name: nfsplugin-dir
+            - mountPath: /registration
+              name: registration-dir
+        - name: disk-driver-registrar
+          imagePullPolicy: IfNotPresent
+          image: hub.kce.ksyun.com/ksyun/csi-node-driver-registrar:v2.2.0-mp
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/com.ksc.csi.diskplugin/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            limits:
+              cpu: 200m
+              memory: 400Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          volumeMounts:
+            - name: diskplugin-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+        - name: csi-diskplugin
+          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:1.9.1-open
+          args :
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--node-server=true"
+            - "--controller-server=false"
+            # - "--v=2"
+            # - "--metric=false"
+            # - "--max-volumes-pernode=8"
+            - --max-volumes-pernode=8
+            - --metric=false
+            - --v=5
+          env:
+            - name: CSI_ENDPOINT
+              value: unix://var/lib/kubelet/plugins/com.ksc.csi.driverplugin-replace/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: AKSK_CONF
+              valueFrom:
+                configMapKeyRef:
+                  key: aksk-conf
+                  name: csi-aksk-conf
+          imagePullPolicy: "Always"
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          resources:
+            limits:
+              cpu: 500m
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: pods-mount-dir
+              mountPath: /var/lib/kubelet/
+              mountPropagation: "Bidirectional"
+            - name: device-dir
+              mountPath: /dev
+            - name: aksk
+              mountPath: /var/lib/aksk
+      volumes:
+        - hostPath:
+            path: /var/lib/kubelet/plugins_registry/
+            type: Directory
+          name: registration-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins/com.ksc.csi.diskplugin/
+            type: DirectoryOrCreate
+          name: diskplugin-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins/com.ksc.csi.nfsplugin/
+            type: DirectoryOrCreate
+          name: nfsplugin-dir
+        - hostPath:
+            path: /var/lib/kubelet/
+            type: Directory
+          name: pods-mount-dir
+        - hostPath:
+            path: /dev/
+            type: ""
+          name: device-dir
+        - name: aksk
+          secret:
+            secretName: kce-security-token
