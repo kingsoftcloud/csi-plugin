@@ -1,32 +1,97 @@
 # ksc csi diskplugin
 
-实现了金山云 EBS 云硬盘和集群 csi 接口的对接，完成在k8s集群通过 storageclass 和 pvc 资源自动的从金山云硬盘创建并挂载对应的pv持久化存储卷。
+金山云CSI插件， 实现了在Kubernetes集群中对金山云云存储卷的生命周期管理，支持动态创建、挂载、使用云数据卷。
 
 **注意：** 
 1. 由于金山云硬盘不支持跨可用区挂载，所以要保证集群的所有node节点都在同一个可用区。
-2. 支持的k8s版本: v1.12 以上
+2. 支持的k8s版本: v1.17 以上
 
+## 服务编译和发布
 
-### 服务编译和发布
+1. 构建镜像： 
 
-构建镜像：
+修改Makefile，将“yourcipherkey”改为实际的密钥，若SK无需加密，则设置为空
 
-    make build VERSION=v0.1.1
-    
-推送镜像：
+例如KEY='404633a025a386e110d54242a48f885e'，则
+```
+CIPHER_KEY=$(shell echo "404633a025a386e110d54242a48f885e")
+```
+若不加密，则
+```
+CIPHER_KEY=$(shell echo "")
+```
+修改完成后执行
+```sh
+make build
+```    
+2. 推送镜像：
 
-    make push VERSION=v0.1.1
+请将Makefile中镜像仓库地址修改为自己实际的地址
+```
+BJKSYUNREPOSITORY:= hub.kce.ksyun.com/ksyun
+```
+修改完成后执行
+```
+make push
+```
 
-单元测试：
+## 配置AKSK
+示例：
+```yaml
+AK："AKTRQxqRY0SdCw31S46rrcMA"
+SK："ODPedeQvrIo2BF6QkzkZ1HZdhkjH648cOF0fVXGt"
+KEY: "404633a025a386e110d54242a48f885e"（32位）
+```
+### 1. 如果需要对SK加密，则执行以下操作：
+注意：如果不需要对SK加密，请忽略此步
 
-    make test
+* 首先将KEY字符串转换16进制：
 
-部署：
+string转16进制命令：
+```sh
+# echo -n '404633a025a386e110d54242a48f885e' | xxd -p
+3430343633336130323561333836653131306435343234326134386638383565
+```
+* 执行加密命令：
+```sh
+#echo -n "ODPedeQvrIo2BF6QkzkZ1HZdhkjH648cOF0fVXGt" |openssl enc -aes-256-cbc -e -a -K 3430343633336130323561333836653131306435343234326134386638383565 -iv 34303436333361303235613338366531
+```
+参数说明：
+
+-e 加密
+
+-a  加密后以base64编码
+
+-K 加密key （16进制）
+
+-iv iv值(固定长度：16位)   （16进制）取密钥key的前16位作为iv值
+
+加密后字符串：
+```sh
+70aM3hAdVJMB/yJHOxIB3iHyST0aijaIQWoIXCo6yLgFRofS2lHs62Q0Z6wAhgY+
+```
+
+### 2. 创建secret，将AK、SK保存在其中
+* 当对SK加密时：
+```sh
+# kubectl create secret generic kce-security-token --from-literal=ak='AKTRQxqRY0SdCw31S46rrcMA' --from-literal=sk='70aM3hAdVJMB/yJHOxIB3iHyST0aijaIQWoIXCo6yLgFRofS2lHs62Q0Z6wAhgY+' --from-literal=cipher='aes256+base64' -n kube-system
+```
+* 当不对SK加密时：
+```sh
+# kubectl create secret generic kce-security-token --from-literal=ak='AKTRQxqRY0SdCw31S46rrcMA' --from-literal=sk='ODPedeQvrIo2BF6QkzkZ1HZdhkjH648cOF0fVXGt' -n kube-system
+```
+
+## 部署：
 1. 配置kubectl命令连接到集群
-2. 执行 `make deploy_v0.1.0` 部署csi插件服务
+2. 修改deploy目录下controller-plugin.yaml和node-plugin.yaml文件中csi-diskplugin容器的镜像地址为您的实际地址
+```
+image: hub.kce.ksyun.com/ksyun/csi-diskplugin:1.9.1-open
+imagePullPolicy: Always
+name: csi-diskplugin
+```
+3. 执行 `make deploy_all` 部署csi插件服务
 
-
-### 使用 csi plugin 存储卷
+## 使用 csi plugin 存储卷
 
 #### 动态存储卷
 

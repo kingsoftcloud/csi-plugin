@@ -1,9 +1,4 @@
-##############################################
-###########                       ############
-###########   Controller plugin   ############
-###########                       ############
-##############################################
-
+---
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
@@ -22,152 +17,153 @@ spec:
         app: csi-controller
         role: csi-do
     spec:
+      priorityClassName: system-node-critical
       serviceAccount: csi-controller-sa
       containers:
-        - name: csi-provisioner
-          image: hub.kce.ksyun.com/ksyun/csi-provisioner:v2.2.2
+        - args:
+            - --feature-gates=Topology=true
+            - --csi-address=$(ADDRESS)
+            - --v=2
+            - --timeout=20s
+            - --retry-interval-start=2s
+            - "--volume-name-prefix=kfs"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/com.ksc.csi.nfsplugin/csi.sock
+          image: hub.kce.ksyun.com/ksyun/csi-provisioner:v2.2.2-mp
+          imagePullPolicy: IfNotPresent
+          name: csi-nfs-provisioner
+          resources:
+            limits:
+              cpu: 500m
+              memory: 400Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          volumeMounts:
+            - mountPath: /var/lib/csi/sockets/com.ksc.csi.nfsplugin/
+              name: nfs-socket-dir
+        - name: csi-disk-provisioner
+          image: hub.kce.ksyun.com/ksyun/csi-provisioner:v2.2.2-mp
           args:
             - "--feature-gates=Topology=true"
-            #- "--node-deployment=true"
             - "--csi-address=$(ADDRESS)"
-            - "--v=5"
+            - "--v=2"
+            - "--timeout=30s"
+            - "--retry-interval-start=3s"
+            - "--leader-election=true"
+            - "--leader-election-namespace=kube-system"
+            - "--volume-name-prefix=disk"
+            - "--extra-create-metadata=true"
           env:
             - name: ADDRESS
-              value: /var/lib/csi/sockets/pluginproxy/csi.sock
-          imagePullPolicy: "Always"
+              value: /var/lib/csi/sockets/com.ksc.csi.diskplugin/csi.sock
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 500m
+              memory: 400Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
           volumeMounts:
-            - name: socket-dir
-              mountPath: /var/lib/csi/sockets/pluginproxy/
-        - name: csi-attacher
-          image: hub.kce.ksyun.com/ksyun/csi-attacher:v3.2.1
+            - name: disk-socket-dir
+              mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
+        - name: csi-disk-attacher
+          image:  hub.kce.ksyun.com/ksyun/csi-attacher:v3.2.1-mp
           args:
-            - "--v=5"
+            - "--v=2"
             - "--csi-address=$(ADDRESS)"
+            - "--timeout=20s"
+            - "--retry-interval-start=2s"
+            - "--leader-election=true"
           env:
             - name: ADDRESS
-              value: /var/lib/csi/sockets/pluginproxy/csi.sock
-          imagePullPolicy: "Always"
+              value: /var/lib/csi/sockets/com.ksc.csi.diskplugin/csi.sock
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 500m
+              memory: 400Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
           volumeMounts:
-            - name: socket-dir
-              mountPath: /var/lib/csi/sockets/pluginproxy/
-        - name: csi-resizer
-          imagePullPolicy: "Always"
-          image: hub.kce.ksyun.com/ksyun/csi-resizer:v1.2.0
+            - name: disk-socket-dir
+              mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
+        - name: csi-disk-resizer
+          imagePullPolicy: IfNotPresent
+          image:  hub.kce.ksyun.com/ksyun/csi-resizer:v1.2.0-mp
           args:
-            - "--v=5"
+            - "--v=2"
             - "--csi-address=$(ADDRESS)"
+            - "--timeout=20s"
+            - "--leader-election=true"
           env:
             - name: ADDRESS
-              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+              value: /var/lib/csi/sockets/com.ksc.csi.diskplugin/csi.sock
+          resources:
+            limits:
+              cpu: 500m
+              memory: 400Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
           volumeMounts:
-            - name: socket-dir
-              mountPath: /var/lib/csi/sockets/pluginproxy/
-        - name: csi-diskplugin
-          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:v0.2.1
-          args :
-            - "--endpoint=$(CSI_ENDPOINT)"
-            - "--controller-server=true"
-            - "--v=5"
-            - "--alsologtostderr=true"
+            - name: disk-socket-dir
+              mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
+        - args:
+            - --endpoint=$(CSI_ENDPOINT)
+            - --driver=com.ksc.csi.diskplugin,com.ksc.csi.nfsplugin
+            - --v=2
           env:
             - name: CSI_ENDPOINT
-              value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+              value: unix:///var/lib/csi/sockets/com.ksc.csi.driverplugin-replace/csi.sock
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-          imagePullPolicy: "Always"
+            - name: AKSK_CONF
+              valueFrom:
+                configMapKeyRef:
+                  key: aksk-conf
+                  name: csi-aksk-conf
+          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:1.9.1-amd64-open
+          imagePullPolicy: Always
+          name: csi-diskplugin
+          resources:
+            limits:
+              cpu: 500m
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+            privileged: true
           volumeMounts:
-            - name: socket-dir
-              mountPath: /var/lib/csi/sockets/pluginproxy/
-            - name: cluster-info-dir
-              mountPath: /opt/app-agent/arrangement
+            - mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
+              name: pods-mount-dir
+            - mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
+              name: disk-socket-dir
+            - mountPath: /var/lib/csi/sockets/com.ksc.csi.nfsplugin/
+              name: nfs-socket-dir
+            - mountPath: /var/lib/aksk
+              name: aksk
       volumes:
-        - name: socket-dir
-          emptyDir: {}
-        - name: cluster-info-dir
-          hostPath:
-            path: /opt/app-agent/arrangement
+        - emptyDir: {}
+          name: disk-socket-dir
+        - emptyDir: {}
+          name: nfs-socket-dir
+        - hostPath:
+            path: /var/lib/kubelet/pods
             type: Directory
----
-
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: csi-controller-sa
-  namespace: kube-system
-
----
-
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: csi-do-provisioner-role
-rules:
-  - apiGroups: [""]
-    resources: ["secrets", "pods"]
-    verbs: ["get", "list"]
-  - apiGroups: [""]
-    resources: ["persistentvolumes", "persistentvolumeclaims/status"]
-    verbs: ["get", "list", "watch", "create", "delete", "patch"]
-  - apiGroups: [""]
-    resources: ["persistentvolumeclaims"]
-    verbs: ["get", "list", "watch", "update"]
-  - apiGroups: ["storage.k8s.io"]
-    resources: ["storageclasses"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["events"]
-    verbs: ["list", "watch", "create", "update", "patch"]
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["get", "list"]
-
----
-
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: csi-do-provisioner-binding
-subjects:
-  - kind: ServiceAccount
-    name: csi-controller-sa
-    namespace: kube-system
-roleRef:
-  kind: ClusterRole
-  name: csi-do-provisioner-role
-  apiGroup: rbac.authorization.k8s.io
-
----
-# Attacher must be able to work with PVs, nodes and VolumeAttachments
-
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: csi-do-attacher-role
-rules:
-  - apiGroups: [""]
-    resources: ["persistentvolumes"]
-    verbs: ["get", "list", "watch", "update", "patch"]
-  - apiGroups: [""]
-    resources: ["nodes"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["storage.k8s.io"]
-    resources: ["volumeattachments", "csinodes", "volumeattachments/status"]
-    verbs: ["get", "list", "watch", "update", "patch"]
-
----
-
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: csi-do-attacher-binding
-subjects:
-  - kind: ServiceAccount
-    name: csi-controller-sa
-    namespace: kube-system
-roleRef:
-  kind: ClusterRole
-  name: csi-do-attacher-role
-  apiGroup: rbac.authorization.k8s.io
+          name: pods-mount-dir
+        - secret:
+            secretName: kce-security-token
+          name: aksk

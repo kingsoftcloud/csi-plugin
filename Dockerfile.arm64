@@ -1,5 +1,5 @@
-FROM hub.kce.ksyun.com/tekton/arm64v8/alpine-ca-certificates
-#FROM arm64v8/alpine
+FROM alpine:3.18.4
+
 LABEL maintainers="ksyun"
 
 #RUN sed -i 's/http\:\/\/dl-cdn.alpinelinux.org/https\:\/\/mirrors.ustc.edu.cn/g' /etc/apk/repositories

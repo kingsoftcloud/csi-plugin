@@ -45,13 +45,6 @@ func InitAksk(k8sclient *k8sclient.Clientset) {
 }
 
 func SetAksk() (*AkskConfig, error) {
-	//cm, err := akskconfig.K8sClient.CoreV1().ConfigMaps(Namespace).Get(context.Background(), ConfigMapName, meta_v1.GetOptions{})
-	//if err != nil {
-	//	klog.Errorf("get configmap %v:%v", ConfigMapName, err)
-	//	return &akskconfig, err
-	//}
-	//akskconfig.AkskType = cm.Data["type"]
-
 	var aksk AkskConfig
 
 	content := os.Getenv("AKSK_CONF")

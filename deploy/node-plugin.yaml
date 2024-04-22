@@ -1,9 +1,4 @@
-########################################
-###########                 ############
-###########   Node plugin   ############
-###########                 ############
-#######################################
-
+---
 kind: DaemonSet
 apiVersion: apps/v1
 metadata:
@@ -19,121 +14,144 @@ spec:
         app: csi-diskplugin
         role: csi-do
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: type
+                    operator: NotIn
+                    values:
+                      - virtual-kubelet
+      priorityClassName: system-node-critical
       serviceAccount: csi-diskplugin-sa
       hostNetwork: true
+      tolerations:
+        - operator: Exists
       containers:
-        - name: driver-registrar
-          image: hub.kce.ksyun.com/ksyun/csi-node-driver-registrar:v2.2.0
-          args:
-            - "--v=5"
-            - "--csi-address=/csi/csi.sock"
-           # - "--plugin-registration-path=/registration"
-            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+        - args:
+            - --v=2
+            - --csi-address=$(ADDRESS)
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
           env:
             - name: ADDRESS
               value: /csi/csi.sock
             - name: DRIVER_REG_SOCK_PATH
-              value: /data/kubelet/plugins/com.ksc.csi.diskplugin/csi.sock
-            - name: KUBE_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-          volumeMounts:
-            - name: plugin-dir
-              mountPath: /csi
-            - name: registration-dir
-              mountPath: /registration
-        - name: csi-diskplugin
-          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:v0.2.1
-          args :
-            - "--endpoint=$(CSI_ENDPOINT)"
-            - "--node-server=true"
-            - "--v=5"
-            - "--alsologtostderr=true"
-          env:
-            - name: CSI_ENDPOINT
-              value: unix:///csi/csi.sock
+              value: /var/lib/kubelet/plugins/com.ksc.csi.nfsplugin/csi.sock
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+          image: hub.kce.ksyun.com/ksyun/csi-node-driver-registrar:v2.2.0-mp
+          imagePullPolicy: IfNotPresent
+          name: nfs-driver-registrar
+          resources:
+            limits:
+              cpu: 200m
+              memory: 400Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          volumeMounts:
+            - mountPath: /csi
+              name: nfsplugin-dir
+            - mountPath: /registration
+              name: registration-dir
+        - name: disk-driver-registrar
+          imagePullPolicy: IfNotPresent
+          image: hub.kce.ksyun.com/ksyun/csi-node-driver-registrar:v2.2.0-mp
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/com.ksc.csi.diskplugin/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            limits:
+              cpu: 200m
+              memory: 400Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          volumeMounts:
+            - name: diskplugin-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+        - name: csi-diskplugin
+          image: hub.kce.ksyun.com/ksyun/csi-diskplugin:1.9.1-amd64-open
+          args :
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--node-server=true"
+            - "--controller-server=false"
+            - "--v=2"
+            # - "--metric=false"
+            # - "--max-volumes-pernode=8"
+            - --max-volumes-pernode=8
+            - --metric=false
+          env:
+            - name: CSI_ENDPOINT
+              value: unix://var/lib/kubelet/plugins/com.ksc.csi.driverplugin-replace/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: AKSK_CONF
+              valueFrom:
+                configMapKeyRef:
+                  key: aksk-conf
+                  name: csi-aksk-conf
           imagePullPolicy: "Always"
           securityContext:
             privileged: true
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
+          resources:
+            limits:
+              cpu: 500m
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 128Mi
           volumeMounts:
-            - name: plugin-dir
-              mountPath: /csi
             - name: pods-mount-dir
-              mountPath: /data/kubelet/
-              # needed so that any mounts setup inside this container are
-              # propagated back to the host machine.
+              mountPath: /var/lib/kubelet/
               mountPropagation: "Bidirectional"
             - name: device-dir
               mountPath: /dev
-            - name: cluster-info-dir
-              mountPath: /opt/app-agent/arrangement
+            - name: aksk
+              mountPath: /var/lib/aksk
       volumes:
-        - name: registration-dir
-          hostPath:
-            path: /data/kubelet/plugins_registry/
+        - hostPath:
+            path: /var/lib/kubelet/plugins_registry/
             type: Directory
-        - name: plugin-dir
-          hostPath:
-            path: /data/kubelet/plugins/com.ksc.csi.diskplugin/
+          name: registration-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins/com.ksc.csi.diskplugin/
             type: DirectoryOrCreate
-        - name: pods-mount-dir
-          hostPath:
-            path: /data/kubelet/
+          name: diskplugin-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins/com.ksc.csi.nfsplugin/
+            type: DirectoryOrCreate
+          name: nfsplugin-dir
+        - hostPath:
+            path: /var/lib/kubelet/
             type: Directory
-        - name: device-dir
-          hostPath:
+          name: pods-mount-dir
+        - hostPath:
             path: /dev/
-        - name: cluster-info-dir
-          hostPath:
-            path: /opt/app-agent/arrangement
-            type: Directory
----
-
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: csi-diskplugin-sa
-  namespace: kube-system
-
----
-
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: csi-do-driver-registrar-role
-  namespace: kube-system
-rules:
-  - apiGroups: [""]
-    resources: ["nodes"]
-    verbs: ["get", "list", "update"]
-  - apiGroups: [""]
-    resources: ["events"]
-    verbs: ["get", "list", "watch", "create", "update", "patch"]
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["get", "list"]
-
----
-
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: csi-do-driver-registrar-binding
-  namespace: kube-system
-subjects:
-  - kind: ServiceAccount
-    name: csi-diskplugin-sa
-    namespace: kube-system
-roleRef:
-  kind: ClusterRole
-  name: csi-do-driver-registrar-role
-  apiGroup: rbac.authorization.k8s.io
+            type: ""
+          name: device-dir
+        - name: aksk
+          secret:
+            secretName: kce-security-token
