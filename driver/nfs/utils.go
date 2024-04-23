@@ -32,6 +32,24 @@ import (
 	netutil "k8s.io/utils/net"
 )
 
+const (
+	separator = "#"
+	delete    = "delete"
+	retain    = "retain"
+	archive   = "archive"
+)
+
+var supportedOnDeleteValues = []string{"", delete, retain, archive}
+
+func validateOnDeleteValue(onDelete string) error {
+	for _, v := range supportedOnDeleteValues {
+		if strings.EqualFold(v, onDelete) {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid value %s for OnDelete, supported values are %v", onDelete, supportedOnDeleteValues)
+}
+
 func NewDefaultIdentityServer(d *Driver) *IdentityServer {
 	return &IdentityServer{
 		Driver: d,
@@ -98,7 +116,7 @@ func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, h
 }
 
 type VolumeLocks struct {
-	locks sets.String
+	locks sets.String //nolint:staticcheck
 	mux   sync.Mutex
 }
 

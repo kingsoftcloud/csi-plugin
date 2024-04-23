@@ -54,6 +54,8 @@ type nfsVolume struct {
 	size int64
 	// pv name when subDir is not empty
 	uuid string
+	// on delete action
+	onDelete string
 }
 
 // Ordering of elements in the CSI volume id.
@@ -67,10 +69,9 @@ const (
 	idBaseDir
 	idSubDir
 	idUUID
+	idOnDelete
 	totalIDElements // Always last
 )
-
-const separator = "#"
 
 // CreateVolume create a volume
 func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
@@ -95,6 +96,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		case paramServer:
 		case paramShare:
 		case paramSubDir:
+		case paramOnDelete:
 		case pvcNamespaceKey:
 		case pvcNameKey:
 		case pvNameKey:
@@ -111,7 +113,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 	}
 
-	nfsVol, err := newNFSVolume(name, reqCapacity, parameters)
+	nfsVol, err := newNFSVolume(name, reqCapacity, parameters, cs.Driver.defaultOnDeletePolicy)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -177,22 +179,47 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		}
 	}
 
-	// mount nfs base share so we can delete the subdirectory
-	if err = cs.internalMount(ctx, nfsVol, nil, volCap); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to mount nfs server: %v", err.Error())
+	if nfsVol.onDelete == "" {
+		nfsVol.onDelete = cs.Driver.defaultOnDeletePolicy
 	}
-	defer func() {
-		if err = cs.internalUnmount(ctx, nfsVol); err != nil {
-			klog.Warningf("failed to unmount nfs server: %v", err.Error())
+
+	if !strings.EqualFold(nfsVol.onDelete, retain) {
+		// mount nfs base share so we can delete the subdirectory
+		if err = cs.internalMount(ctx, nfsVol, nil, volCap); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to mount nfs server: %v", err.Error())
 		}
-	}()
+		defer func() {
+			if err = cs.internalUnmount(ctx, nfsVol); err != nil {
+				klog.Warningf("failed to unmount nfs server: %v", err.Error())
+			}
+		}()
 
-	// delete subdirectory under base-dir
-	internalVolumePath := getInternalVolumePath(cs.Driver.workingMountDir, nfsVol)
+		internalVolumePath := getInternalVolumePath(cs.Driver.workingMountDir, nfsVol)
 
-	klog.V(2).Infof("Removing subdirectory at %v", internalVolumePath)
-	if err = os.RemoveAll(internalVolumePath); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to delete subdirectory: %v", err.Error())
+		if strings.EqualFold(nfsVol.onDelete, archive) {
+			archivedInternalVolumePath := filepath.Join(getInternalMountPath(cs.Driver.workingMountDir, nfsVol), "archived-"+nfsVol.subDir)
+			if strings.Contains(nfsVol.subDir, "/") {
+				parentDir := filepath.Dir(archivedInternalVolumePath)
+				klog.V(2).Infof("DeleteVolume: subidrectory(%s) contains '/', make sure the parent directory(%s) exists", nfsVol.subDir, parentDir)
+				if err = os.MkdirAll(parentDir, 0777); err != nil {
+					return nil, status.Errorf(codes.Internal, "create parent directory(%s) of %s failed with %v", parentDir, archivedInternalVolumePath)
+				}
+			}
+
+			// archive subdirectory under base-dir
+			klog.V(2).Infof("archiving subdirectory at %s --> %s", internalVolumePath, archivedInternalVolumePath)
+			if err = os.Rename(internalVolumePath, archivedInternalVolumePath); err != nil {
+				return nil, status.Errorf(codes.Internal, "archive subdirectory(%s, %s) failed with %v", internalVolumePath, archivedInternalVolumePath, err.Error())
+			}
+		} else {
+			// delete subdirectory under base-dir
+			klog.V(2).Infof("Removing subdirectory at %v", internalVolumePath)
+			if err = os.RemoveAll(internalVolumePath); err != nil {
+				return nil, status.Errorf(codes.Internal, "delete subdirectory(%s) failed with %v", internalVolumePath, err.Error())
+			}
+		}
+	} else {
+		klog.V(2).Infof("DeleteVolume: volume(%s) is set to retain,not deleting/archiving subdirectory", volumeID)
 	}
 
 	return &csi.DeleteVolumeResponse{}, nil
@@ -306,8 +333,8 @@ func (cs *ControllerServer) internalUnmount(ctx context.Context, vol *nfsVolume)
 }
 
 // newNFSVolume Convert VolumeCreate parameters to an nfsVolume
-func newNFSVolume(name string, size int64, params map[string]string) (*nfsVolume, error) {
-	var server, baseDir, subDir string
+func newNFSVolume(name string, size int64, params map[string]string, defaultOnDeletePolicy string) (*nfsVolume, error) {
+	var server, baseDir, subDir, onDelete string
 	subDirReplaceMap := map[string]string{}
 
 	// validate parameters (case-insensitive)
@@ -319,6 +346,8 @@ func newNFSVolume(name string, size int64, params map[string]string) (*nfsVolume
 			baseDir = v
 		case paramSubDir:
 			subDir = v
+		case paramOnDelete:
+			onDelete = v
 		case pvcNamespaceKey:
 			subDirReplaceMap[pvcNamespaceMetadata] = v
 		case pvcNameKey:
@@ -346,6 +375,16 @@ func newNFSVolume(name string, size int64, params map[string]string) (*nfsVolume
 		// make volume id unique if subDir is provided
 		vol.uuid = name
 	}
+
+	if err := validateOnDeleteValue(onDelete); err != nil {
+		return nil, err
+	}
+
+	vol.onDelete = defaultOnDeletePolicy
+	if onDelete != "" {
+		vol.onDelete = onDelete
+	}
+
 	vol.id = getVolumeIDFromNfsVol(vol)
 	return vol, nil
 }
@@ -380,6 +419,9 @@ func getVolumeIDFromNfsVol(vol *nfsVolume) string {
 	idElements[idBaseDir] = strings.Trim(vol.baseDir, "/")
 	idElements[idSubDir] = strings.Trim(vol.subDir, "/")
 	idElements[idUUID] = vol.uuid
+	if strings.EqualFold(vol.onDelete, retain) || strings.EqualFold(vol.onDelete, archive) {
+		idElements[idOnDelete] = vol.onDelete
+	}
 	return strings.Join(idElements, separator)
 }
 
@@ -388,10 +430,10 @@ func getVolumeIDFromNfsVol(vol *nfsVolume) string {
 //
 //	  new volumeID:
 //		    nfs-server.default.svc.cluster.local#share#pvc-4bcbf944-b6f7-4bd0-b50f-3c3dd00efc64
-//		    nfs-server.default.svc.cluster.local#share#subdir#pvc-4bcbf944-b6f7-4bd0-b50f-3c3dd00efc64
+//		    nfs-server.default.svc.cluster.local#share#subdir#pvc-4bcbf944-b6f7-4bd0-b50f-3c3dd00efc64#retain
 //	  old volumeID: nfs-server.default.svc.cluster.local/share/pvc-4bcbf944-b6f7-4bd0-b50f-3c3dd00efc64
 func getNfsVolFromID(id string) (*nfsVolume, error) {
-	var server, baseDir, subDir, uuid string
+	var server, baseDir, subDir, uuid, onDelete string
 	segments := strings.Split(id, separator)
 	if len(segments) < 3 {
 		klog.V(2).Infof("could not split %s into server, baseDir and subDir with separator(%s)", id, separator)
@@ -411,14 +453,18 @@ func getNfsVolFromID(id string) (*nfsVolume, error) {
 		if len(segments) >= 4 {
 			uuid = segments[3]
 		}
+		if len(segments) >= 5 {
+			onDelete = segments[4]
+		}
 	}
 
 	return &nfsVolume{
-		id:      id,
-		server:  server,
-		baseDir: baseDir,
-		subDir:  subDir,
-		uuid:    uuid,
+		id:       id,
+		server:   server,
+		baseDir:  baseDir,
+		subDir:   subDir,
+		uuid:     uuid,
+		onDelete: onDelete,
 	}, nil
 }
 
