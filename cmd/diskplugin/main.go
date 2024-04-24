@@ -54,9 +54,10 @@ var (
 	driverName        = flag.String("driver", DiskNFSMultiDriverName, "CSI Driver, support multi driver and  separated by ','")
 	maxVolumesPerNode = flag.Int64("max-volumes-pernode", 8, "Only EBS: maximum number of volumes that can be attached to node")
 	//nfs
-	mountPermissions      = flag.Uint64("mount-permissions", 0, "mounted folder permissions")
-	workingMountDir       = flag.String("working-mount-dir", "/tmp", "working directory for provisioner to mount nfs shares temporarily")
-	defaultOnDeletePolicy = flag.String("default-ondelete-policy", "", "default policy for deleting subdirectory when deleting a volume")
+	mountPermissions             = flag.Uint64("mount-permissions", 0, "mounted folder permissions")
+	workingMountDir              = flag.String("working-mount-dir", "/tmp", "working directory for provisioner to mount nfs shares temporarily")
+	defaultOnDeletePolicy        = flag.String("default-ondelete-policy", "", "default policy for deleting subdirectory when deleting a volume")
+	volStatsCacheExpireInMinutes = flag.Int("vol-stats-cache-expire-in-minutes", 10, "The cache expire time in minutes for volume stats cache")
 )
 
 func newK8SClient() *k8sclient.Clientset {
@@ -124,12 +125,13 @@ func getNFSDriver(epName string) *nfs.Driver {
 		klog.Warningf("nodeid is empty, err: %v", err)
 	}
 	driverOptions := nfs.DriverOptions{
-		NodeID:                nodeID,
-		DriverName:            NFSDriverName,
-		Endpoint:              epName,
-		MountPermissions:      *mountPermissions,
-		WorkingMountDir:       *workingMountDir,
-		DefaultOnDeletePolicy: *defaultOnDeletePolicy,
+		NodeID:                       nodeID,
+		DriverName:                   NFSDriverName,
+		Endpoint:                     epName,
+		MountPermissions:             *mountPermissions,
+		WorkingMountDir:              *workingMountDir,
+		DefaultOnDeletePolicy:        *defaultOnDeletePolicy,
+		VolStatsCacheExpireInMinutes: *volStatsCacheExpireInMinutes,
 	}
 	return nfs.NewDriver(&driverOptions)
 
