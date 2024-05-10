@@ -349,11 +349,14 @@ func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 	if capRange == nil {
 		return nil, status.Error(codes.InvalidArgument, "Capacity range not provided")
 	}
-	volumeType, err := GetVolumeInfo(volID)
+
+	volumeInfo, err := d.config.EbsClient.GetVolume(&ebsClient.ListVolumesReq{VolumeIds: []string{volID}})
 	if err != nil {
+		klog.Warning("volume %s not found ,err: %v", volID, err)
 		return nil, err
 	}
-	devName := getDiskSource(volID, volumeType)
+
+	devName := getDiskSource(volID, volumeInfo.VolumeType)
 
 	mnt := req.VolumeCapability.GetMount()
 	switch mnt.FsType {

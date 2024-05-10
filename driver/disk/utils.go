@@ -691,26 +691,6 @@ func GetAvailableDiskTypes(instanceType string) (DataDiskTypes []string, err err
 	return DataDiskTypes, nil
 }
 
-func GetVolumeInfo(VolumeId string) (VolumeType string, err error) {
-	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
-	VolumesInfoResp := &VolumesInfoResp{}
-
-	payloads := fmt.Sprintf("VolumeId.1=%v", VolumeId)
-	resp, err := cli.DoRequest("ebs", "Action=DescribeVolumes", payloads)
-	if err != nil {
-		return "", err
-	}
-
-	err = json.Unmarshal(resp, &VolumesInfoResp)
-	if err != nil {
-		klog.Error("Error decoding json: ", err)
-		return "", err
-	}
-	VolumeType = VolumesInfoResp.Volumes[0].VolumeType
-
-	return VolumeType, nil
-}
-
 func getVolumeCount(instanceID string) (int64, error) {
 	var availableVolumeCount int
 	instanceType, err := GetInstanceType(instanceID)
