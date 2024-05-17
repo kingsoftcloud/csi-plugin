@@ -1,8 +1,6 @@
 module csi-plugin
 
-go 1.22.0
-
-toolchain go1.22.2
+go 1.21
 
 require (
 	github.com/aws/aws-sdk-go v1.44.320
@@ -13,7 +11,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.33.0
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/net v0.23.0
+	golang.org/x/net v0.24.0
 	google.golang.org/grpc v1.59.0
 	k8s.io/api v0.30.0
 	k8s.io/apimachinery v0.30.0
@@ -22,7 +20,7 @@ require (
 	k8s.io/kubernetes v1.18.8
 	k8s.io/mount-utils v0.24.4
 	k8s.io/utils v0.0.0-20231127182322-b307cd553661
-	sigs.k8s.io/cloud-provider-azure v1.30.0
+	sigs.k8s.io/cloud-provider-azure v1.28.9
 	sigs.k8s.io/yaml v1.4.0
 )
 
@@ -53,7 +51,7 @@ require (
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
-	google.golang.org/protobuf v1.33.0 // indirect
+	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

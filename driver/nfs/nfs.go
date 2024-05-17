@@ -17,6 +17,7 @@ limitations under the License.
 package nfs
 
 import (
+	"k8s.io/client-go/kubernetes"
 	"runtime"
 	"strings"
 	"time"
@@ -37,6 +38,7 @@ type DriverOptions struct {
 	WorkingMountDir              string
 	DefaultOnDeletePolicy        string
 	VolStatsCacheExpireInMinutes int
+	K8sClient                    kubernetes.Interface
 }
 
 type Driver struct {
@@ -57,6 +59,8 @@ type Driver struct {
 	// a timed cache storing volume stats <volumeID, volumeStats>
 	volStatsCache                azcache.Resource
 	volStatsCacheExpireInMinutes int
+
+	K8sClient kubernetes.Interface
 }
 
 const (
@@ -91,6 +95,7 @@ func NewDriver(options *DriverOptions) *Driver {
 		mountPermissions:             options.MountPermissions,
 		workingMountDir:              options.WorkingMountDir,
 		volStatsCacheExpireInMinutes: options.VolStatsCacheExpireInMinutes,
+		K8sClient:                    options.K8sClient,
 	}
 
 	n.AddControllerServiceCapabilities([]csi.ControllerServiceCapability_RPC_Type{

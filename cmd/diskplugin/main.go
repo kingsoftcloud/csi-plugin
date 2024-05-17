@@ -132,6 +132,7 @@ func getNFSDriver(epName string) *nfs.Driver {
 		WorkingMountDir:              *workingMountDir,
 		DefaultOnDeletePolicy:        *defaultOnDeletePolicy,
 		VolStatsCacheExpireInMinutes: *volStatsCacheExpireInMinutes,
+		K8sClient:                    newK8SClient(),
 	}
 	return nfs.NewDriver(&driverOptions)
 

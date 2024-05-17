@@ -7,6 +7,8 @@ allowVolumeExpansion: false
 parameters:
   server:
   share:
+  csi.storage.k8s.io/provisioner-secret-namespace: "default"
+  csi.storage.k8s.io/provisioner-secret-name: "mount-options"
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
 mountOptions:

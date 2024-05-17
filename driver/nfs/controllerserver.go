@@ -18,6 +18,7 @@ package nfs
 
 import (
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -168,7 +169,15 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 
 	var volCap *csi.VolumeCapability
+
 	mountOptions := getMountOptions(req.GetSecrets())
+	if mountOptions == "" {
+		pvInfo, err := cs.Driver.K8sClient.CoreV1().PersistentVolumes().Get(context.Background(), nfsVol.subDir, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("DeleteVolume: Get Volume: %s from cluster error: %s, volumeName is: %s", req.VolumeId, err.Error(), nfsVol.subDir)
+		}
+		mountOptions = strings.Join(pvInfo.Spec.MountOptions, ",")
+	}
 	if mountOptions != "" {
 		klog.V(2).Infof("DeleteVolume: found mountOptions(%s) for volume(%s)", mountOptions, volumeID)
 		volCap = &csi.VolumeCapability{
