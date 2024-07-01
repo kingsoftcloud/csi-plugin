@@ -1,11 +1,15 @@
+# diskTags to add tags when create disk.
+# tags use "," to division, and tag format as "key:value";
+
 allowVolumeExpansion: true
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: ssd
+  name: kingsoftcloud-disk-ssd-tag
 parameters:
   chargetype: Daily
   type: SSD3.0
+  tags: "key1:value1,key2:value2"
 provisioner: com.ksc.csi.diskplugin
 reclaimPolicy: Delete
 volumeBindingMode: Immediate

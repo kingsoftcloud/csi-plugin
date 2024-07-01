@@ -2,11 +2,10 @@ allowVolumeExpansion: true
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: xfs
+  name: kingsoftcloud-disk-topology
 parameters:
   chargetype: Daily
   type: SSD3.0
-  fsType: xfs
 provisioner: com.ksc.csi.diskplugin
 reclaimPolicy: Delete
-volumeBindingMode: Immediate
+volumeBindingMode: WaitForFirstConsumer

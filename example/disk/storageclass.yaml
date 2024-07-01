@@ -2,11 +2,10 @@ allowVolumeExpansion: true
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: tag
+  name: kingsoftcloud-disk
 parameters:
   chargetype: Daily
-  type: SSD3.0
-  tags: "key1:value1,key2:value2,key3:value3,key4:value4"
+  type: SSD3.0 #SSD3.0,ESSD_PL0,ESSD_PL1,ESSD_PL2,ESSD_PL3,EHDD
 provisioner: com.ksc.csi.diskplugin
 reclaimPolicy: Delete
-volumeBindingMode: Immediate
+volumeBindingMode: WaitForFirstConsumer

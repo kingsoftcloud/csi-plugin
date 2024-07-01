@@ -6,6 +6,7 @@ require (
 	github.com/aws/aws-sdk-go v1.44.320
 	github.com/container-storage-interface/spec v1.6.0
 	github.com/golang/protobuf v1.5.4
+	github.com/kingsoftcloud/aksk-provider v1.0.0
 	github.com/kubernetes-csi/csi-lib-utils v0.11.0
 	github.com/kubernetes-csi/csi-test v2.2.0+incompatible
 	github.com/onsi/ginkgo v1.16.5

@@ -58,10 +58,8 @@ func SetAksk() (*AkskConfig, error) {
 
 	switch aksk.AkskType {
 	case "configmap", "secret", "", "file":
-		aksk.AkskFilePath = aksk.AkskFilePath
 		aksk.Akskprovider = file.NewFileAKSKProvider(aksk.AkskFilePath, DefaultCipherKey)
 	case "env":
-		//akskconfig.Encrypt, err = strconv.ParseBool(cm.Data["Encrypt"])\
 		aksk.Akskprovider = env.NewEnvAKSKProvider(aksk.Encrypt, DefaultCipherKey)
 	default:
 		return nil, fmt.Errorf("please set aksk type")

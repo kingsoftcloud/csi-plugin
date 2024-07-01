@@ -17,12 +17,9 @@ metadata:
   annotations:
     meta.helm.sh/release-name: js-csi-diskplugin
     meta.helm.sh/release-namespace: miks
-  creationTimestamp: "2022-06-24T10:23:26Z"
   labels:
     app.kubernetes.io/managed-by: Helm
   name: js-sc
-  resourceVersion: "295212765"
-  uid: 64c28d24-0790-4de2-91dc-a29ef98820e6
 parameters:
   chargetype: Daily
   region: eu-east-1

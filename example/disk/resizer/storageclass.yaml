@@ -1,12 +1,11 @@
-allowVolumeExpansion: true
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: wffc
+  name: kingsoftcloud-disk-expand
 parameters:
   chargetype: Daily
   type: SSD3.0
-#  zone: cn-beijing-6a
 provisioner: com.ksc.csi.diskplugin
 reclaimPolicy: Delete
-volumeBindingMode: WaitForFirstConsumer
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
