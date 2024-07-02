@@ -103,7 +103,6 @@ func (cli *Client) buildRequestWithBodyReader(serviceName string, body io.Reader
 }
 
 func (cli *Client) DoRequest(service string, query string, payloads ...string) ([]byte, error) {
-	//aksk := util.AKSK{}
 	akskConfig, err := util.SetAksk()
 	if err != nil {
 		return nil, err
@@ -113,13 +112,11 @@ func (cli *Client) DoRequest(service string, query string, payloads ...string) (
 	if err != nil {
 		return nil, err
 	}
-	klog.V(5).Infof("aksk is %v", aksk)
 
 	ak, sk := aksk.AK, aksk.SK
-	klog.V(5).Infof("AK is: %v, SK is: %v, token is %v", ak, sk, aksk.SecurityToken)
 
 	if len(cli.region) == 0 {
-		cli.region = akskConfig.Region
+		cli.region, _ = akskConfig.GetRegion()
 	}
 	s := v4.Signer{Credentials: credentials.NewStaticCredentials(ak, sk, "")}
 
@@ -182,7 +179,6 @@ func (cli *Client) DoRequest(service string, query string, payloads ...string) (
 		if err = json.Unmarshal(res_body, &error_resp); err != nil {
 			klog.Error("JSON unmarshal failed:", err)
 		}
-		klog.V(5).Infof("get AK: %s, SK: %s", ak, sk)
 		return res_body, errors.New(error_resp.Error.Message)
 	}
 

@@ -37,16 +37,14 @@ type AkskConfig struct {
 	Region       string               `json:"region"`
 }
 
-var akskconfig = AkskConfig{}
+var aksk = AkskConfig{}
 var DefaultCipherKey string
 
 func InitAksk(k8sclient *k8sclient.Clientset) {
-	akskconfig.K8sClient = k8sclient
+	aksk.K8sClient = k8sclient
 }
 
 func SetAksk() (*AkskConfig, error) {
-	var aksk AkskConfig
-
 	content := os.Getenv("AKSK_CONF")
 	if content == "" {
 		return nil, fmt.Errorf("aksk config is null")
@@ -67,19 +65,17 @@ func SetAksk() (*AkskConfig, error) {
 	return &aksk, nil
 }
 
-func (c AkskConfig) GetRegion() (string, error) {
-	c.Region = os.Getenv("Region")
-
-	nodeName := os.Getenv("KUBE_NODE_NAME")
-	if nodeName == "" {
-		klog.Errorf("nodeName is empty")
+func (c *AkskConfig) GetRegion() (string, error) {
+	if c.Region == "" {
+		nodeName := os.Getenv("KUBE_NODE_NAME")
+		if nodeName == "" {
+			klog.Errorf("nodeName is empty")
+		}
+		node, err := c.K8sClient.CoreV1().Nodes().Get(context.Background(), nodeName, meta_v1.GetOptions{})
+		if err != nil {
+			klog.Errorf("AKSK get node Region error.")
+		}
+		c.Region = node.Labels[NodeRegionKey]
 	}
-	k8sCli := c.K8sClient
-	node, err := k8sCli.CoreV1().Nodes().Get(context.Background(), nodeName, meta_v1.GetOptions{})
-	if err != nil {
-		klog.Errorf("AKSK get node Region error.")
-	}
-	c.Region = node.Labels[NodeRegionKey]
-
 	return c.Region, nil
 }

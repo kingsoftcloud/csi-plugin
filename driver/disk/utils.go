@@ -623,15 +623,23 @@ func UpdateNode(nodes core_v1.NodeInterface, instanceID string) {
 		Steps:    9.,
 	}
 
-	for _, patchData := range []struct {
-		patch []byte
-		label string
-	}{
-		{patch: patch, label: "instance storage"},
-		{patch: patchRegion, label: "instance region"},
-	} {
+	if needUpdateRegion {
 		for {
-			_, err := nodes.Patch(ctx, nodeName, types.StrategicMergePatchType, patchData.patch, meta_v1.PatchOptions{})
+			_, err := nodes.Patch(ctx, nodeName, types.StrategicMergePatchType, patchRegion, meta_v1.PatchOptions{})
+			if err == nil {
+				break
+			}
+			klog.Errorf("UpdateNode:: failed to update node status: %v", err)
+			if errors.Is(err, ctx.Err()) {
+				return
+			}
+			time.Sleep(backoff.Step())
+		}
+	}
+
+	if needUpdate {
+		for {
+			_, err := nodes.Patch(ctx, nodeName, types.StrategicMergePatchType, patch, meta_v1.PatchOptions{})
 			if err == nil {
 				break
 			}

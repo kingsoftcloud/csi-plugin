@@ -8,7 +8,7 @@ ARCH ?= amd64
 # Ksyun repository
 BJKSYUNREPOSITORY ?= hub.kce.ksyun.com/ksyun
 
-CIPHER_KEY=$(shell echo "404633a025a386e110d54242a48f885e")
+CIPHER_KEY=$(shell echo "")
 ldflags := "-X csi-plugin/util.DefaultCipherKey=${CIPHER_KEY}"
 
 all: clean compile build tag push
@@ -26,7 +26,7 @@ build: compile
 tag: build
 	docker tag csi-diskplugin:$(VERSION)-$(ARCH) $(BJKSYUNREPOSITORY)/csi-diskplugin:$(VERSION)-$(ARCH)-open
 push: tag
-	docker push $(BJKSYUNREPOSITORY)/csi-diskplugin:$(VERSION)-$(ARCH)-open
+	docker push $(BJKSYUNREPOSITORY)/csi-diskplugin:$(VERSION)-$(ARCH)
 
 build-mp:
 	docker buildx build --platform=linux/amd64,linux/arm64 -t hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-mp -f Dockerfile.mp --push .
