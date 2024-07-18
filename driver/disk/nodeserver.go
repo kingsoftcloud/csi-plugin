@@ -61,10 +61,17 @@ func GetNodeServer(cfg *Config) *NodeServer {
 		panic(err)
 	}
 
-	maxVolumesNum, err := getVolumeCount(instanceUUID)
-	if err != nil {
+	var maxVolumesNum int64
+
+	if isPhysical {
+		klog.V(5).Info("This is a physical machine. Skip the query of the number of available volumes.")
 		maxVolumesNum = DefaultMaxVolumesPerNode
-		klog.Error(err)
+	} else {
+		maxVolumesNum, err = getVolumeCount(instanceUUID)
+		if err != nil {
+			maxVolumesNum = DefaultMaxVolumesPerNode
+			klog.Error(err)
+		}
 	}
 	nodeServer := &NodeServer{
 		config:            *cfg,
