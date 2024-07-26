@@ -96,6 +96,7 @@ func NewDriver(options *DriverOptions) *Driver {
 		workingMountDir:              options.WorkingMountDir,
 		volStatsCacheExpireInMinutes: options.VolStatsCacheExpireInMinutes,
 		K8sClient:                    options.K8sClient,
+		defaultOnDeletePolicy:        options.DefaultOnDeletePolicy,
 	}
 
 	n.AddControllerServiceCapabilities([]csi.ControllerServiceCapability_RPC_Type{

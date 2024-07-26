@@ -1,0 +1,12 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: kingsoftcloud-disk-project
+parameters:
+  chargetype: Daily
+  type: SSD3.0
+  projectid: "105602"
+provisioner: com.ksc.csi.diskplugin
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
