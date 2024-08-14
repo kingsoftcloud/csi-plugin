@@ -461,7 +461,7 @@ func getCsiVolumeInfo(diskType string, volumeId string, size int64, volumeContex
 	accessibleTopology := []*csi.Topology{
 		{
 			Segments: map[string]string{
-				util.NodeRegionKey:                      zone[:len(zone)-1],
+				util.NodeRegionKey:                      strings.TrimSuffix(zone[:len(zone)-1], "-"),
 				util.NodeZoneKey:                        zone,
 				fmt.Sprintf(nodeStorageLabel, diskType): "available",
 			},
@@ -551,7 +551,7 @@ func UpdateNode(nodes core_v1.NodeInterface, instanceID string) {
 		instanceInfo, err := GetInstanceInfo(instanceID)
 		instanceType = instanceInfo.InstanceType
 		instanceZone = instanceInfo.AvailabilityZone
-		instanceRegion = instanceZone[:len(instanceZone)-1]
+		instanceRegion = strings.TrimSuffix(instanceZone[:len(instanceZone)-1], "-")
 		if err != nil {
 			return
 		}
@@ -759,7 +759,14 @@ func getVolumeCount(instanceID string) (int64, error) {
 	}
 	InstanceTypeConfigSet := DescribeInstanceTypeConfigsResp.InstanceTypeConfigSet
 	DataDiskQuotaSet := InstanceTypeConfigSet[0].DataDiskQuotaSet
-
-	availableVolumeCount = DataDiskQuotaSet[0].DataDiskCount
+Loop:
+	for _, DataDiskQuota := range DataDiskQuotaSet {
+		for _, volumeType := range AvailableVolumeTypes {
+			if DataDiskQuota.DataDiskType == volumeType {
+				availableVolumeCount = DataDiskQuota.DataDiskCount
+				break Loop
+			}
+		}
+	}
 	return int64(availableVolumeCount), nil
 }

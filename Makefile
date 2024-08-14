@@ -1,7 +1,7 @@
 #host
 #10.69.69.225 hub-t.kce.ksyun.com
 
-VERSION ?= 1.8.11
+VERSION ?= 1.8.12
 
 ARCH ?= amd64
 
