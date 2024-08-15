@@ -19,8 +19,10 @@ package nfs
 import (
 	"fmt"
 	"os"
+	azcache "sigs.k8s.io/cloud-provider-azure/pkg/cache"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"golang.org/x/net/context"
@@ -51,16 +53,23 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if len(targetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
 	}
+
+	lockKey := fmt.Sprintf("%s-%s", volumeID, targetPath)
+	if acquired := ns.Driver.volumeLocks.TryAcquire(lockKey); !acquired {
+		return nil, status.Errorf(codes.Aborted, volumeOperationAlreadyExistsFmt, volumeID)
+	}
+	defer ns.Driver.volumeLocks.Release(lockKey)
+
 	mountOptions := volCap.GetMount().GetMountFlags()
 	if req.GetReadonly() {
 		mountOptions = append(mountOptions, "ro")
 	}
-	
+
 	var server, baseDir, subDir string
 	subDirReplaceMap := map[string]string{}
 
 	mountPermissions := ns.Driver.mountPermissions
-	performChmodOp := (mountPermissions > 0)
+	//performChmodOp := (mountPermissions > 0)
 	for k, v := range req.GetVolumeContext() {
 		switch strings.ToLower(k) {
 		case paramServer:
@@ -82,14 +91,8 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		case mountPermissionsField:
 			if v != "" {
 				var err error
-				var perm uint64
-				if perm, err = strconv.ParseUint(v, 8, 32); err != nil {
+				if mountPermissions, err = strconv.ParseUint(v, 8, 32); err != nil {
 					return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("invalid mountPermissions %s", v))
-				}
-				if perm == 0 {
-					performChmodOp = false
-				} else {
-					mountPermissions = perm
 				}
 			}
 		}
@@ -138,7 +141,7 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	if performChmodOp {
+	if mountPermissions > 0 {
 		if err := chmodIfPermissionMismatch(targetPath, os.FileMode(mountPermissions)); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -160,8 +163,22 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.InvalidArgument, "Target path missing in request")
 	}
 
+	lockKey := fmt.Sprintf("%s-%s", volumeID, targetPath)
+	if acquired := ns.Driver.volumeLocks.TryAcquire(lockKey); !acquired {
+		return nil, status.Errorf(codes.Aborted, volumeOperationAlreadyExistsFmt, volumeID)
+	}
+	defer ns.Driver.volumeLocks.Release(lockKey)
+
 	klog.V(2).Infof("NodeUnpublishVolume: unmounting volume %s on %s", volumeID, targetPath)
-	err := mount.CleanupMountPoint(targetPath, ns.mounter, true /*extensiveMountPointCheck*/)
+	var err error
+	extensiveMountPointCheck := true
+	forceUnmounter, ok := ns.mounter.(mount.MounterForceUnmounter)
+	if ok {
+		klog.V(2).Infof("force unmount %s on %s", volumeID, targetPath)
+		err = mount.CleanupMountWithForce(targetPath, forceUnmounter, extensiveMountPointCheck, 30*time.Second)
+	} else {
+		err = mount.CleanupMountPoint(targetPath, ns.mounter, extensiveMountPointCheck)
+	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to unmount target %q: %v", targetPath, err)
 	}
@@ -191,6 +208,17 @@ func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	}
 	if len(req.VolumePath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats volume path was empty")
+	}
+
+	// check if the volume stats is cached
+	cache, err := ns.Driver.volStatsCache.Get(req.VolumeId, azcache.CacheReadTypeDefault)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
+	if cache != nil {
+		resp := cache.(csi.NodeGetVolumeStatsResponse)
+		klog.V(6).Infof("NodeGetVolumeStats: volume stats for volume %s path %s is cached", req.VolumeId, req.VolumePath)
+		return &resp, nil
 	}
 
 	if _, err := os.Lstat(req.VolumePath); err != nil {
@@ -231,7 +259,7 @@ func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Errorf(codes.Internal, "failed to transform disk inodes used(%v)", volumeMetrics.InodesUsed)
 	}
 
-	return &csi.NodeGetVolumeStatsResponse{
+	resp := csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
 			{
 				Unit:      csi.VolumeUsage_BYTES,
@@ -246,7 +274,11 @@ func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 				Used:      inodesUsed,
 			},
 		},
-	}, nil
+	}
+
+	// cache the volume stats per volume
+	ns.Driver.volStatsCache.Set(req.VolumeId, resp)
+	return &resp, err
 }
 
 // NodeUnstageVolume unstage volume

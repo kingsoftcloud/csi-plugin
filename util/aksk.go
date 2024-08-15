@@ -2,17 +2,22 @@ package util
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	prvd "github.com/kingsoftcloud/aksk-provider"
+	"github.com/kingsoftcloud/aksk-provider/env"
+	"github.com/kingsoftcloud/aksk-provider/file"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
+	"os"
 )
 
 const (
 	Resource      = "configmaps"
 	Namespace     = "kube-system"
-	ConfigMapName = "user-temp-aksk"
+	ConfigMapName = "aksk-config"
+	SecretName    = "kce-security-token"
 )
 
 type AKSK struct {
@@ -23,27 +28,54 @@ type AKSK struct {
 	Region        string
 }
 
-var aksk = AKSK{}
-
-func InitAksk(k8sclient *k8sclient.Clientset) {
-	aksk.K8sclient = k8sclient
+type AkskConfig struct {
+	AkskType     string               `json:"aksk_type"`
+	AkskFilePath string               `json:"aksk_file_path"`
+	Encrypt      bool                 `json:"encrypt"`
+	Akskprovider prvd.AKSKProvider    `json:"-"`
+	K8sClient    *k8sclient.Clientset `json:"-"`
+	Region       string               `json:"region"`
 }
 
-func GetAKSK() (AKSK, error) {
-	cm, err := aksk.K8sclient.CoreV1().ConfigMaps(Namespace).Get(context.Background(), ConfigMapName, v1.GetOptions{})
-	if err != nil {
-		klog.Errorf("get configmap %v: %v", ConfigMapName, err)
-		return aksk, err
-	}
-	aksk.AK = cm.Data["ak"]
-	aksk.SK = cm.Data["sk"]
-	aksk.Region = cm.Data["region"]
-	securityToken, ok := cm.Data["securityToken"]
-	if !ok {
-		return aksk, fmt.Errorf("securityToken not found in configmap %s", ConfigMapName)
-	}
-	aksk.SecurityToken = securityToken
+var aksk = AkskConfig{}
+var DefaultCipherKey string
 
-	klog.V(5).Infof("get AK: %s, SK: %s, region: %s", aksk.AK, aksk.SK, aksk.Region)
-	return aksk, nil
+func InitAksk(k8sclient *k8sclient.Clientset) {
+	aksk.K8sClient = k8sclient
+}
+
+func SetAksk() (*AkskConfig, error) {
+	content := os.Getenv("AKSK_CONF")
+	if content == "" {
+		return nil, fmt.Errorf("aksk config is null")
+	}
+
+	if err := json.Unmarshal([]byte(content), &aksk); err != nil {
+		return nil, fmt.Errorf("json unmarshal %s error: %v", content, err)
+	}
+
+	switch aksk.AkskType {
+	case "configmap", "secret", "", "file":
+		aksk.Akskprovider = file.NewFileAKSKProvider(aksk.AkskFilePath, DefaultCipherKey)
+	case "env":
+		aksk.Akskprovider = env.NewEnvAKSKProvider(aksk.Encrypt, DefaultCipherKey)
+	default:
+		return nil, fmt.Errorf("please set aksk type")
+	}
+	return &aksk, nil
+}
+
+func (c *AkskConfig) GetRegion() (string, error) {
+	if c.Region == "" {
+		nodeName := os.Getenv("KUBE_NODE_NAME")
+		if nodeName == "" {
+			klog.Errorf("nodeName is empty")
+		}
+		node, err := c.K8sClient.CoreV1().Nodes().Get(context.Background(), nodeName, meta_v1.GetOptions{})
+		if err != nil {
+			klog.Errorf("AKSK get node Region error.")
+		}
+		c.Region = node.Labels[NodeRegionKey]
+	}
+	return c.Region, nil
 }

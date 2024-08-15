@@ -1,0 +1,11 @@
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: kingsoftcloud-disk-topology
+parameters:
+  chargetype: Daily
+  type: SSD3.0
+provisioner: com.ksc.csi.diskplugin
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer

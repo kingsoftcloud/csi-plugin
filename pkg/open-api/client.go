@@ -103,16 +103,20 @@ func (cli *Client) buildRequestWithBodyReader(serviceName string, body io.Reader
 }
 
 func (cli *Client) DoRequest(service string, query string, payloads ...string) ([]byte, error) {
-	aksk := util.AKSK{}
-	ak, sk := cli.accessKeyId, cli.accessKeySecret
-	if ak == "" || sk == "" {
-		aksk, _ = util.GetAKSK()
-		ak = aksk.AK
-		sk = aksk.SK
+	akskConfig, err := util.SetAksk()
+	if err != nil {
+		return nil, err
 	}
 
+	aksk, err := akskConfig.Akskprovider.GetAKSK()
+	if err != nil {
+		return nil, err
+	}
+
+	ak, sk := aksk.AK, aksk.SK
+
 	if len(cli.region) == 0 {
-		cli.region = aksk.Region
+		cli.region, _ = akskConfig.GetRegion()
 	}
 	s := v4.Signer{Credentials: credentials.NewStaticCredentials(ak, sk, "")}
 
@@ -134,7 +138,7 @@ func (cli *Client) DoRequest(service string, query string, payloads ...string) (
 	req.Header.Set("X-Ksc-Security-Token", aksk.SecurityToken)
 
 	req.URL.RawQuery = query
-	_, err := s.Sign(req, body, service, cli.region, time.Now())
+	_, err = s.Sign(req, body, service, cli.region, time.Now())
 	if err != nil {
 		klog.Error("Request Sign failed: ", err)
 		return nil, err
@@ -175,7 +179,6 @@ func (cli *Client) DoRequest(service string, query string, payloads ...string) (
 		if err = json.Unmarshal(res_body, &error_resp); err != nil {
 			klog.Error("JSON unmarshal failed:", err)
 		}
-		klog.V(5).Infof("get AK: %s, SK: %s", ak, sk)
 		return res_body, errors.New(error_resp.Error.Message)
 	}
 

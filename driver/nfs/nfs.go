@@ -17,35 +17,50 @@ limitations under the License.
 package nfs
 
 import (
+	"k8s.io/client-go/kubernetes"
+	"runtime"
 	"strings"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"k8s.io/klog"
 	mount "k8s.io/mount-utils"
+
+	azcache "sigs.k8s.io/cloud-provider-azure/pkg/cache"
 )
 
 // DriverOptions defines driver parameters specified in driver deployment
 type DriverOptions struct {
-	NodeID           string
-	DriverName       string
-	Endpoint         string
-	MountPermissions uint64
-	WorkingMountDir  string
+	NodeID                       string
+	DriverName                   string
+	Endpoint                     string
+	MountPermissions             uint64
+	WorkingMountDir              string
+	DefaultOnDeletePolicy        string
+	VolStatsCacheExpireInMinutes int
+	K8sClient                    kubernetes.Interface
 }
 
 type Driver struct {
-	name             string
-	nodeID           string
-	version          string
-	endpoint         string
-	mountPermissions uint64
-	workingMountDir  string
+	name                  string
+	nodeID                string
+	version               string
+	endpoint              string
+	mountPermissions      uint64
+	workingMountDir       string
+	defaultOnDeletePolicy string
 
 	//ids *identityServer
 	ns          *NodeServer
 	cscap       []*csi.ControllerServiceCapability
 	nscap       []*csi.NodeServiceCapability
 	volumeLocks *VolumeLocks
+
+	// a timed cache storing volume stats <volumeID, volumeStats>
+	volStatsCache                azcache.Resource
+	volStatsCacheExpireInMinutes int
+
+	K8sClient kubernetes.Interface
 }
 
 const (
@@ -58,6 +73,7 @@ const (
 	//     "base" instead of "/base"
 	paramShare            = "share"
 	paramSubDir           = "subdir"
+	paramOnDelete         = "ondelete"
 	mountOptionsField     = "mountoptions"
 	mountPermissionsField = "mountpermissions"
 	pvcNameKey            = "csi.storage.k8s.io/pvc/name"
@@ -72,12 +88,15 @@ func NewDriver(options *DriverOptions) *Driver {
 	klog.V(2).Infof("Driver: %v version: %v", options.DriverName, driverVersion)
 
 	n := &Driver{
-		name:             options.DriverName,
-		version:          driverVersion,
-		nodeID:           options.NodeID,
-		endpoint:         options.Endpoint,
-		mountPermissions: options.MountPermissions,
-		workingMountDir:  options.WorkingMountDir,
+		name:                         options.DriverName,
+		version:                      driverVersion,
+		nodeID:                       options.NodeID,
+		endpoint:                     options.Endpoint,
+		mountPermissions:             options.MountPermissions,
+		workingMountDir:              options.WorkingMountDir,
+		volStatsCacheExpireInMinutes: options.VolStatsCacheExpireInMinutes,
+		K8sClient:                    options.K8sClient,
+		defaultOnDeletePolicy:        options.DefaultOnDeletePolicy,
 	}
 
 	n.AddControllerServiceCapabilities([]csi.ControllerServiceCapability_RPC_Type{
@@ -91,6 +110,17 @@ func NewDriver(options *DriverOptions) *Driver {
 		csi.NodeServiceCapability_RPC_UNKNOWN,
 	})
 	n.volumeLocks = NewVolumeLocks()
+
+	if options.VolStatsCacheExpireInMinutes <= 0 {
+		options.VolStatsCacheExpireInMinutes = 10 // default expire in 10 minutes
+	}
+
+	var err error
+	getter := func(key string) (interface{}, error) { return nil, nil }
+	if n.volStatsCache, err = azcache.NewTimedCache(time.Duration(options.VolStatsCacheExpireInMinutes)*time.Minute, getter, false); err != nil {
+		klog.Fatalf("Failed to create cache: %v", err)
+	}
+
 	return n
 }
 
@@ -108,7 +138,12 @@ func (n *Driver) Run(testMode bool) {
 	}
 	klog.V(2).Infof("\nDRIVER INFORMATION:\n-------------------\n%s\n\nStreaming logs below:", versionMeta)
 
-	n.ns = NewNodeServer(n, mount.New(""))
+	mounter := mount.New("")
+	if runtime.GOOS == "linux" {
+		// MounterForceUnmounter is only implemented on Linux now
+		mounter = mounter.(mount.MounterForceUnmounter)
+	}
+	n.ns = NewNodeServer(n, mounter)
 	s := NewNonBlockingGRPCServer()
 	s.Start(n.endpoint,
 		NewDefaultIdentityServer(n),

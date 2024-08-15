@@ -61,10 +61,17 @@ func GetNodeServer(cfg *Config) *NodeServer {
 		panic(err)
 	}
 
-	maxVolumesNum, err := getVolumeCount(instanceUUID)
-	if err != nil {
+	var maxVolumesNum int64
+
+	if isPhysical {
+		klog.V(5).Info("This is a physical machine. Skip the query of the number of available volumes.")
 		maxVolumesNum = DefaultMaxVolumesPerNode
-		klog.Error(err)
+	} else {
+		maxVolumesNum, err = getVolumeCount(instanceUUID)
+		if err != nil {
+			maxVolumesNum = DefaultMaxVolumesPerNode
+			klog.Error(err)
+		}
 	}
 	nodeServer := &NodeServer{
 		config:            *cfg,
@@ -349,11 +356,14 @@ func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 	if capRange == nil {
 		return nil, status.Error(codes.InvalidArgument, "Capacity range not provided")
 	}
-	volumeType, err := GetVolumeInfo(volID)
+
+	volumeInfo, err := d.config.EbsClient.GetVolume(&ebsClient.ListVolumesReq{VolumeIds: []string{volID}})
 	if err != nil {
+		klog.Warning("volume %s not found ,err: %v", volID, err)
 		return nil, err
 	}
-	devName := getDiskSource(volID, volumeType)
+
+	devName := getDiskSource(volID, volumeInfo.VolumeType)
 
 	mnt := req.VolumeCapability.GetMount()
 	switch mnt.FsType {

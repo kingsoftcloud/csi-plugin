@@ -1,6 +1,4 @@
-FROM hub.kce.ksyun.com/tekton/alpine-ca-certificates
-#FROM hub.kce.ksyun.com/tekton/amd64/alpine:3.10.3
-#FROM hub.kce.ksyun.com/tekton/alpine:3.9
+FROM alpine:3.18.4
 
 LABEL maintainers="ksyun"
 

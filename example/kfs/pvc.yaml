@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: tag-ssd
+  name: kfs-pvc
   namespace: default
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: tag
+  storageClassName: kfsplugin
   resources:
     requests:
-      storage: 10Gi
+      storage: 20Gi

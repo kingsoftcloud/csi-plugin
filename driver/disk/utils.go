@@ -86,8 +86,10 @@ type InstanceState struct {
 	Name string `json:"Name,omitempty"`
 }
 type InstancesSet struct {
-	InstanceType  string        `json:"InstanceType,omitempty"`
-	InstanceState InstanceState `json:"InstanceState,omitempty"`
+	InstanceID       string        `json:"InstanceID,omitempty"`
+	InstanceType     string        `json:"InstanceType,omitempty"`
+	InstanceState    InstanceState `json:"InstanceState,omitempty"`
+	AvailabilityZone string        `json:"AvailabilityZone,omitempty"`
 }
 
 type DescribeInstanceTypeConfigsResp struct {
@@ -539,18 +541,27 @@ func UpdateNode(nodes core_v1.NodeInterface, instanceID string) {
 		klog.Errorf("UpdateNode:: get node info error : %s", err.Error())
 	}
 	instanceType := nodeInfo.Labels[instanceTypeLabel]
-	//zone := nodeInfo.Labels[NodeZoneKey]
+	instanceRegion := nodeInfo.Labels[NodeRegionKey]
+	instanceZone := nodeInfo.Labels[NodeZoneKey]
 
-	if instanceType == "" {
+	if instanceType == "" || instanceRegion == "" || instanceZone == "" {
 		//There will be a certain delay in obtaining the instance ID using annotations,
 		//resulting in failure to obtain the instance model.
 		//instanceID := nodeInfo.Annotations[InstanceUuid]
-		instanceType, err = GetInstanceType(instanceID)
+		instanceInfo, err := GetInstanceInfo(instanceID)
+		instanceType = instanceInfo.InstanceType
+		instanceZone = instanceInfo.AvailabilityZone
+		instanceRegion = instanceZone[:len(instanceZone)-1]
 		if err != nil {
 			return
 		}
 		//instanceType = nodeInfo.Labels[KceLabelZoneKey]
 		//zone = nodeInfo.Labels[KecLabelZoneKey]
+	}
+
+	instanceRegionLables := map[string]string{
+		NodeRegionKey: instanceRegion,
+		NodeZoneKey:   instanceZone,
 	}
 
 	instanceStorageLabels := map[string]string{}
@@ -576,7 +587,15 @@ func UpdateNode(nodes core_v1.NodeInterface, instanceID string) {
 		}
 	}
 
-	if !needUpdate {
+	needUpdateRegion := false
+	for l, v := range instanceRegionLables {
+		if nodeInfo.Labels[l] != v {
+			needUpdateRegion = true
+			break
+		}
+	}
+
+	if !needUpdate && !needUpdateRegion {
 		klog.Infof("UpdateNode:: no need to update node")
 		return
 	}
@@ -589,22 +608,49 @@ func UpdateNode(nodes core_v1.NodeInterface, instanceID string) {
 		klog.Errorf("UpdateNode:: failed to marshal patch json")
 	}
 
+	patchRegion, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": instanceRegionLables,
+		},
+	})
+	if err != nil {
+		klog.Errorf("UpdateNode:: failed to marshal patchRegion json")
+	}
+
 	backoff := wait.Backoff{
 		Duration: time.Second,
 		Factor:   2.,
 		Steps:    9.,
 	}
-	for {
-		_, err = nodes.Patch(ctx, nodeName, types.StrategicMergePatchType, patch, meta_v1.PatchOptions{})
-		if err == nil {
-			break
+
+	if needUpdateRegion {
+		for {
+			_, err := nodes.Patch(ctx, nodeName, types.StrategicMergePatchType, patchRegion, meta_v1.PatchOptions{})
+			if err == nil {
+				break
+			}
+			klog.Errorf("UpdateNode:: failed to update node status: %v", err)
+			if errors.Is(err, ctx.Err()) {
+				return
+			}
+			time.Sleep(backoff.Step())
 		}
-		klog.Errorf("UpdateNode:: failed to update node status: %v", err)
-		if errors.Is(err, ctx.Err()) {
-			return
-		}
-		time.Sleep(backoff.Step())
 	}
+
+	if needUpdate {
+		for {
+			_, err := nodes.Patch(ctx, nodeName, types.StrategicMergePatchType, patch, meta_v1.PatchOptions{})
+			if err == nil {
+				break
+			}
+			klog.Errorf("UpdateNode:: failed to update node status: %v", err)
+			if errors.Is(err, ctx.Err()) {
+				return
+			}
+			time.Sleep(backoff.Step())
+		}
+	}
+
 	klog.V(5).Infof("UpdateNode:: finished")
 }
 
@@ -632,10 +678,10 @@ func GetProjectId() (ProjectId []int, err error) {
 	return ProjectId, nil
 }
 
-func GetInstanceType(InstanceId string) (InstanceType string, err error) {
+func GetInstanceInfo(InstanceId string) (*InstancesSet, error) {
 	ProjectIds, err := GetProjectId()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
@@ -648,22 +694,20 @@ func GetInstanceType(InstanceId string) (InstanceType string, err error) {
 	resp, err := cli.DoRequest("kec", "Action=DescribeInstances", payload)
 	if err != nil {
 		klog.Errorf("GetInstanceType::payload is %v, err is %v", payload, err)
-		return "", err
+		return nil, err
 	}
 
 	err = json.Unmarshal(resp, &DescribeInstancesResp)
 	if err != nil {
 		klog.Error("Error decoding json: ", err)
-		return "", err
+		return nil, err
 	}
 
 	if DescribeInstancesResp.InstanceCount == 0 {
-		return "", fmt.Errorf("this instance was not found,please confirm whether it exists")
+		return nil, fmt.Errorf("this instance was not found,please confirm whether it exists")
 	}
-	InstancesSet := DescribeInstancesResp.InstancesSet
-	InstanceType = InstancesSet[0].InstanceType
-
-	return InstanceType, nil
+	instancesInfo := DescribeInstancesResp.InstancesSet[0]
+	return &instancesInfo, nil
 }
 
 func GetAvailableDiskTypes(instanceType string) (DataDiskTypes []string, err error) {
@@ -691,29 +735,10 @@ func GetAvailableDiskTypes(instanceType string) (DataDiskTypes []string, err err
 	return DataDiskTypes, nil
 }
 
-func GetVolumeInfo(VolumeId string) (VolumeType string, err error) {
-	cli := OpenApi.New(GlobalConfigVar.OpenApiConfig)
-	VolumesInfoResp := &VolumesInfoResp{}
-
-	payloads := fmt.Sprintf("VolumeId.1=%v", VolumeId)
-	resp, err := cli.DoRequest("ebs", "Action=DescribeVolumes", payloads)
-	if err != nil {
-		return "", err
-	}
-
-	err = json.Unmarshal(resp, &VolumesInfoResp)
-	if err != nil {
-		klog.Error("Error decoding json: ", err)
-		return "", err
-	}
-	VolumeType = VolumesInfoResp.Volumes[0].VolumeType
-
-	return VolumeType, nil
-}
-
 func getVolumeCount(instanceID string) (int64, error) {
 	var availableVolumeCount int
-	instanceType, err := GetInstanceType(instanceID)
+	instanceInfo, err := GetInstanceInfo(instanceID)
+	instanceType := instanceInfo.InstanceType
 	if err != nil {
 		return DefaultMaxVolumesPerNode, err
 	}
