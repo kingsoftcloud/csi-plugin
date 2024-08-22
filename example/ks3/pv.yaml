@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: "pv-ks3"
+spec:
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  csi:
+    driver: tos.csi.volcengine.com
+    volumeHandle: pv-ks3
+    volumeAttributes:
+      # Replaced by the url of your region.
+      url: "http://ks3-cn-beijing-internal.ksyuncs.com"
+      # Replaced by the bucket name you want to use.
+      bucket: "csi-stress"
+      # Replaced by the subPath in bucket you want to use.
+      path: /test
+      # You can specify any other options used by the s3fs command in here.
+      additional_args: "-oensure_diskfree=20480"
+    nodePublishSecretRef:
+      # Replaced by the name and namespace of your secret.
+      name: ks3-secret
+      namespace: kube-system

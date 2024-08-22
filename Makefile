@@ -1,7 +1,7 @@
 #host
 #10.69.69.225 hub-t.kce.ksyun.com
 
-VERSION ?= 1.8.12
+VERSION ?= 1.8.13
 
 ARCH ?= amd64
 
@@ -29,7 +29,7 @@ push: tag
 	docker push $(BJKSYUNREPOSITORY)/csi-diskplugin:$(VERSION)-$(ARCH)
 
 build-mp:
-	docker buildx build --platform=linux/amd64,linux/arm64 -t hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-mp -f Dockerfile.mp --push .
+	docker buildx build --platform=linux/amd64,linux/arm64 -t hub.kce.ksyun.com/yimenghua/csi-diskplugin:$(VERSION)-mp -f Dockerfile.mp --push .
 
 .PHONY: deploy_all
 deploy_v0.1.0:

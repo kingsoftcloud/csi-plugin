@@ -1,7 +1,7 @@
 FROM --platform=$BUILDPLATFORM golang:1.19.3-alpine AS build
 ARG TARGETOS TARGETARCH
 RUN mkdir /csi-plugin
-ENV GOPROXY https://goproxy.cn
+ENV GOPROXY=https://goproxy.cn
 COPY . /csi-plugin/
 WORKDIR /csi-plugin
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o ./bin/csi-diskplugin ./cmd/diskplugin
