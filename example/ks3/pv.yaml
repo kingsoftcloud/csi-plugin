@@ -8,7 +8,7 @@ spec:
   capacity:
     storage: 1Gi
   csi:
-    driver: tos.csi.volcengine.com
+    driver: com.ksc.csi.ks3plugin
     volumeHandle: pv-ks3
     volumeAttributes:
       # Replaced by the url of your region.
@@ -18,7 +18,7 @@ spec:
       # Replaced by the subPath in bucket you want to use.
       path: /test
       # You can specify any other options used by the s3fs command in here.
-      additional_args: "-oensure_diskfree=20480"
+      additional_args: "-oensure_diskfree=2048"
     nodePublishSecretRef:
       # Replaced by the name and namespace of your secret.
       name: ks3-secret

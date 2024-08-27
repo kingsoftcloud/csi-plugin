@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	mount "k8s.io/mount-utils"
 
 	azcache "sigs.k8s.io/cloud-provider-azure/pkg/cache"

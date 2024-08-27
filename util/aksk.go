@@ -9,7 +9,7 @@ import (
 	"github.com/kingsoftcloud/aksk-provider/file"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"os"
 )
 

@@ -10,5 +10,5 @@ spec:
       storage: 1Gi
   # You can specify the pv name manually or just let kubernetes to bind the pv and pvc.
   volumeName: pv-ks3
-  # Currently tos only supports static provisioning, the StorageClass name should be empty.
+  # Currently ks3 only supports static provisioning, the StorageClass name should be empty.
   storageClassName: ""

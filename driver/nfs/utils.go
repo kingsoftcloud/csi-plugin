@@ -28,7 +28,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	netutil "k8s.io/utils/net"
 )
 

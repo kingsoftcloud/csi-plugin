@@ -121,6 +121,8 @@ func getSecretCredential(secrets map[string]string) (string, error) {
 }
 
 func mount(options *ks3fsOptions, mountPoint string, credentialFilePath string) error {
+	klog.V(2).Infof("KS3 mount socket")
+	klog.V(2).Infof("KS3 mount options: %+v", options)
 	httpClient := http.Client{
 		Transport: &http.Transport{
 			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {

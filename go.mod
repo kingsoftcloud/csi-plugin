@@ -11,7 +11,6 @@ require (
 	github.com/kingsoftcloud/aksk-provider v1.0.0
 	github.com/kubernetes-csi/csi-lib-utils v0.11.0
 	github.com/kubernetes-csi/csi-test v2.2.0+incompatible
-	github.com/kubernetes-csi/drivers v1.0.2
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.33.0
 	github.com/stretchr/testify v1.9.0
@@ -22,7 +21,6 @@ require (
 	k8s.io/api v0.30.0
 	k8s.io/apimachinery v0.30.0
 	k8s.io/client-go v0.30.0
-	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.120.1
 	k8s.io/kubernetes v1.18.8
 	k8s.io/mount-utils v0.24.10
@@ -65,6 +63,7 @@ require (
 	k8s.io/apiserver v0.30.0 // indirect
 	k8s.io/cloud-provider v0.30.0 // indirect
 	k8s.io/component-base v0.30.0 // indirect
+	k8s.io/klog v1.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	sigs.k8s.io/structured-merge-diff/v3 v3.0.0 // indirect
 )
