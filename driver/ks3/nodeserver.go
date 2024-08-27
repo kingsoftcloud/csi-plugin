@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/volcengine/volcengine-csi-driver/pkg/util"
-
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -67,19 +65,19 @@ func (ns *NodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		klog.Errorf("create ks3TmpPath for %s failed: %v", volID, err)
 		return nil, status.Errorf(codes.Internal, "create ks3TmpPath for %s failed: %v", volID, err)
 	}
-	notMnt, err := util.DefaultMounter.IsLikelyNotMountPoint(ks3TmpPath)
+	notMnt, err := DefaultMounter.IsLikelyNotMountPoint(ks3TmpPath)
 	if err != nil {
 		klog.Errorf("check ks3TmpPath IsLikelyNotMountPoint for %s failed: %v", volID, err)
 		return nil, status.Errorf(codes.Internal, "check ks3TmpPath IsLikelyNotMountPoint for %s failed: %v", volID, err)
 	}
 	defer func() {
 		if err != nil {
-			util.DefaultMounter.Unmount(ks3TmpPath)
-			util.DefaultMounter.Unmount(targetPath)
+			DefaultMounter.Unmount(ks3TmpPath)
+			DefaultMounter.Unmount(targetPath)
 		}
 	}()
 	if notMnt {
-		if err = mount(options, ks3TmpPath, credFilePath); err != nil {
+		if err = ks3mount(options, ks3TmpPath, credFilePath); err != nil {
 			klog.Errorf("Mount %s to %s failed: %v", volID, ks3TmpPath, err)
 			return nil, status.Errorf(codes.Internal, "mount failed: %v", err)
 		}
@@ -96,7 +94,7 @@ func (ns *NodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	}
 
 	// umount tmp path
-	if err = util.DefaultMounter.Unmount(ks3TmpPath); err != nil {
+	if err = DefaultMounter.Unmount(ks3TmpPath); err != nil {
 		klog.Errorf("Failed to umount ks3TmpPath %s for volume %s: %v", ks3TmpPath, volID, err)
 		return nil, status.Errorf(codes.Internal, "umount failed: %v", err)
 	}
@@ -112,7 +110,7 @@ func (ns *NodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		klog.Errorf("create targetPath for %s failed: %v", volID, err)
 		return nil, status.Errorf(codes.Internal, "create targetPath for %s failed: %v", volID, err)
 	}
-	notMnt, err = util.DefaultMounter.IsLikelyNotMountPoint(targetPath)
+	notMnt, err = DefaultMounter.IsLikelyNotMountPoint(targetPath)
 	if err != nil {
 		klog.Errorf("isMountPoint for %s failed: %v", volID, err)
 		return nil, err
@@ -121,7 +119,7 @@ func (ns *NodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		klog.Infof("Volume %s is already mounted to %s, skipping", volID, targetPath)
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
-	if err = mount(options, targetPath, credFilePath); err != nil {
+	if err = ks3mount(options, targetPath, credFilePath); err != nil {
 		klog.Errorf("Mount %s to %s failed: %v", volID, targetPath, err)
 		return nil, status.Errorf(codes.Internal, "mount failed: %v", err)
 	}
@@ -144,7 +142,7 @@ func (ns *NodeServer) NodeUnpublishVolume(_ context.Context, req *csi.NodeUnpubl
 	volID := req.GetVolumeId()
 	targetPath := req.GetTargetPath()
 
-	if err := util.DefaultMounter.Unmount(targetPath); err != nil {
+	if err := DefaultMounter.Unmount(targetPath); err != nil {
 		if strings.Contains(err.Error(), "not mounted") || strings.Contains(err.Error(), "no mount point specified") {
 			klog.Infof("mountpoint not mounted, skipping: %s", targetPath)
 			return &csi.NodeUnpublishVolumeResponse{}, nil

@@ -14,7 +14,6 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.33.0
 	github.com/stretchr/testify v1.9.0
-	github.com/volcengine/volcengine-csi-driver v0.0.0-20231010034408-7dfd596b3619
 	golang.org/x/net v0.24.0
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.34.1

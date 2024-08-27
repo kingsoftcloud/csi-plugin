@@ -185,7 +185,7 @@ func main() {
 			klog.V(2).Infof("KS3 Driver start: %s", driverName)
 			go func(ep string) {
 				defer wg.Done()
-				k := ks3.NewDriver(KS3DriverName, ep, nodeId)
+				k := ks3.NewDriver(KS3DriverName, version, nodeId)
 				k.Run(ep)
 			}(epName)
 

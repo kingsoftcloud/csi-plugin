@@ -14,13 +14,74 @@ import (
 	"strings"
 	"time"
 
-	"github.com/volcengine/volcengine-csi-driver/pkg/util"
-
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	"os/exec"
 )
+
+// Mounter is responsible for formatting and mounting volumes
+type Mounter interface {
+	mount.Interface
+
+	// ForceUnmount the given target
+	ForceUnmount(target string) error
+}
+
+var DefaultMounter = NewMounter()
+
+type mounter struct {
+	mount.Interface
+}
+
+// NewMounter returns a new mounter instance
+func NewMounter() Mounter {
+	return &mounter{Interface: mount.New("")}
+}
+
+func (m *mounter) ForceUnmount(target string) error {
+	umountCmd := "umount"
+	if target == "" {
+		return errors.New("target is not specified for unmounting the volume")
+	}
+
+	umountArgs := []string{"-f", target}
+
+	klog.Infof("ForceUnmount %s, the command is %s %v", target, umountCmd, umountArgs)
+
+	out, err := exec.Command(umountCmd, umountArgs...).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("unmounting failed: %v cmd: '%s -f %s' output: %q",
+			err, umountCmd, target, string(out))
+	}
+
+	return nil
+}
+
+func CheckDeviceAvailable(devicePath string) error {
+	if devicePath == "" {
+		return status.Error(codes.Internal, "devicePath is empty, cannot used for Volume")
+	}
+
+	if _, err := os.Stat(devicePath); os.IsNotExist(err) {
+		return err
+	}
+
+	// check the device is used for system
+	if devicePath == "/dev/vda" || devicePath == "/dev/vda1" {
+		return fmt.Errorf("devicePath(%s) is system device, cannot used for Volume", devicePath)
+	}
+
+	checkCmd := fmt.Sprintf("mount | grep \"%s on /var/lib/kubelet type\" | wc -l", devicePath)
+	if out, err := run(checkCmd); err != nil {
+		return fmt.Errorf("devicePath(%s) is used to kubelet", devicePath)
+	} else if strings.TrimSpace(out) != "0" {
+		return fmt.Errorf("devicePath(%s) is used as DataDisk for kubelet, cannot used fo Volume", devicePath)
+	}
+	return nil
+}
 
 func validateNodePublishVolumeRequest(req *csi.NodePublishVolumeRequest) error {
 	if req.GetVolumeId() == "" {
@@ -120,7 +181,7 @@ func getSecretCredential(secrets map[string]string) (string, error) {
 	return strings.Join([]string{sid, skey}, ":"), nil
 }
 
-func mount(options *ks3fsOptions, mountPoint string, credentialFilePath string) error {
+func ks3mount(options *ks3fsOptions, mountPoint string, credentialFilePath string) error {
 	klog.V(2).Infof("KS3 mount socket")
 	klog.V(2).Infof("KS3 mount options: %+v", options)
 	httpClient := http.Client{
@@ -180,7 +241,7 @@ func checkKS3Mounted(mountPoint string) error {
 	notMnt := true
 	var err error
 	for i := 0; i < retryTimes; i++ {
-		if notMnt, err = util.DefaultMounter.IsLikelyNotMountPoint(mountPoint); err == nil {
+		if notMnt, err = DefaultMounter.IsLikelyNotMountPoint(mountPoint); err == nil {
 			if !notMnt {
 				break
 			} else {
