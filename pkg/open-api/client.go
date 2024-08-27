@@ -160,9 +160,9 @@ func (cli *Client) DoRequest(service string, query string, payloads ...string) (
 	}
 	//TODO:
 	if len(res_body) > 1024 {
-		klog.V(5).Info("OpenAPI return: ", string(res_body[:1024]))
+		klog.V(2).Info("OpenAPI return: ", string(res_body[:1024]))
 	} else {
-		klog.V(5).Info("OpenAPI return: ", string(res_body))
+		klog.V(2).Info("OpenAPI return: ", string(res_body))
 	}
 
 	type Error struct {
