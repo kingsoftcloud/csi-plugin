@@ -2,7 +2,6 @@ package ks3
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -42,22 +41,24 @@ func ParseEndpoint(ep string) (string, string, error) {
 	return "", "", fmt.Errorf("Invalid endpoint: %v", ep)
 }
 
+func getLogLevel(method string) int32 {
+	if method == "/csi.v1.Identity/Probe" ||
+		method == "/csi.v1.Node/NodeGetCapabilities" ||
+		method == "/csi.v1.Node/NodeGetVolumeStats" {
+		return 5
+	}
+	return 2
+}
+
 func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	klog.Infof("event: grpc_request, method: %s, called with params %s", info.FullMethod, protosanitizer.StripSecrets(req))
+	level := klog.Level(getLogLevel(info.FullMethod))
+	klog.V(5).Infof("event: grpc_request, method: %s, called with params %s", info.FullMethod, protosanitizer.StripSecrets(req))
 
 	resp, err := handler(ctx, req)
 	if err != nil {
 		klog.Errorf("event: grpc_response, method: %s, err: %s", info.FullMethod, err)
 	} else {
-		klog.Infof("event: grpc_response, method: %s, return: %s", info.FullMethod, protosanitizer.StripSecrets(resp))
+		klog.V(level).Infof("event: grpc_response, method: %s, return: %s", info.FullMethod, protosanitizer.StripSecrets(resp))
 	}
 	return resp, err
-}
-
-func run(cmd string) (string, error) {
-	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("Failed to run cmd: %s, with out: %s, error: %s ", cmd, out, err.Error())
-	}
-	return string(out), nil
 }

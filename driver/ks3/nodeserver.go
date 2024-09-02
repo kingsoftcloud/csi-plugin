@@ -72,8 +72,15 @@ func (ns *NodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	}
 	defer func() {
 		if err != nil {
-			DefaultMounter.Unmount(ks3TmpPath)
-			DefaultMounter.Unmount(targetPath)
+			klog.Errorf("NodePublishVolume is err: %v", err)
+			err := DefaultMounter.Unmount(ks3TmpPath)
+			if err != nil {
+				klog.Errorf("NodePublishVolume umount %v is err: %v", ks3TmpPath, err)
+			}
+			err = DefaultMounter.Unmount(targetPath)
+			if err != nil {
+				klog.Errorf("NodePublishVolume umount %v is err: %v", ks3TmpPath, err)
+			}
 		}
 	}()
 	if notMnt {
