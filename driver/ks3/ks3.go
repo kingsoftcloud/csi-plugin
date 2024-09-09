@@ -85,18 +85,6 @@ func (d *Driver) AddVolumeCapabilityAccessModes(vc []csi.VolumeCapability_Access
 	return vca
 }
 
-// AddControllerServiceCapabilities add ControllerServiceCapability_RPC_Type
-func (d *Driver) AddControllerServiceCapabilities(cl []csi.ControllerServiceCapability_RPC_Type) {
-	var csc []*csi.ControllerServiceCapability
-
-	for _, c := range cl {
-		klog.Infof("Enabling controller service capability: %v", c.String())
-		csc = append(csc, NewControllerServiceCapability(c))
-	}
-
-	d.CSCap = csc
-}
-
 // AddNodeServiceCapabilities add NodeServiceCapability_RPC_Type
 func (d *Driver) AddNodeServiceCapabilities(nl []csi.NodeServiceCapability_RPC_Type) {
 	var nsc []*csi.NodeServiceCapability

@@ -41,7 +41,7 @@ const (
 
 	// minimumVolumeSizeInBytes is used to validate that the user is not trying
 	// to create a volume that is smaller than what we support
-	minimumVolumeSizeInBytes int64 = 10 * GB
+	minimumVolumeSizeInBytes int64 = 1 * GB
 
 	// maximumVolumeSizeInBytes is used to validate that the user is not trying
 	// to create a volume that is larger than what we support
@@ -759,6 +759,8 @@ func getVolumeCount(instanceID string) (int64, error) {
 	}
 	InstanceTypeConfigSet := DescribeInstanceTypeConfigsResp.InstanceTypeConfigSet
 	DataDiskQuotaSet := InstanceTypeConfigSet[0].DataDiskQuotaSet
+
+	//Do not add statements within the following loop.
 Loop:
 	for _, DataDiskQuota := range DataDiskQuotaSet {
 		for _, volumeType := range AvailableVolumeTypes {

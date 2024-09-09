@@ -75,11 +75,11 @@ func (ns *NodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 			klog.Errorf("NodePublishVolume is err: %v", err)
 			err := DefaultMounter.Unmount(ks3TmpPath)
 			if err != nil {
-				klog.Errorf("NodePublishVolume umount %v is err: %v", ks3TmpPath, err)
+				klog.Errorf("Defer cleans up the residue, which can be ignored::NodePublishVolume umount %v is err: %v", ks3TmpPath, err)
 			}
 			err = DefaultMounter.Unmount(targetPath)
 			if err != nil {
-				klog.Errorf("NodePublishVolume umount %v is err: %v", ks3TmpPath, err)
+				klog.Errorf("Defer cleans up the residue, which can be ignored::NodePublishVolume umount %v is err: %v", ks3TmpPath, err)
 			}
 		}
 	}()

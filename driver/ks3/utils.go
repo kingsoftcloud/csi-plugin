@@ -11,16 +11,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func NewControllerServiceCapability(cap csi.ControllerServiceCapability_RPC_Type) *csi.ControllerServiceCapability {
-	return &csi.ControllerServiceCapability{
-		Type: &csi.ControllerServiceCapability_Rpc{
-			Rpc: &csi.ControllerServiceCapability_RPC{
-				Type: cap,
-			},
-		},
-	}
-}
-
 func NewNodeServiceCapability(cap csi.NodeServiceCapability_RPC_Type) *csi.NodeServiceCapability {
 	return &csi.NodeServiceCapability{
 		Type: &csi.NodeServiceCapability_Rpc{
