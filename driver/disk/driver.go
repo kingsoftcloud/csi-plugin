@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
 

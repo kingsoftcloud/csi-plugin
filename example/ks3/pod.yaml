@@ -1,0 +1,21 @@
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: csi-ks3
+spec:
+  nodeName: 12.0.3.189
+  containers:
+    - name: csi-ks3
+      image: nginx
+      command:
+        - "/bin/bash"
+        - "-c"
+        - set -euo pipefail; while true; do echo $(hostname) $(date) >> /var/lib/www/$(hostname); sleep 1; done
+      volumeMounts:
+        - mountPath: "/var/lib/www"
+          name: csi-ks3-pvc
+  volumes:
+    - name: csi-ks3-pvc
+      persistentVolumeClaim:
+        claimName: csi-ks3-pvc

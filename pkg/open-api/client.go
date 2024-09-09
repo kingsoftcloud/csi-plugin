@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

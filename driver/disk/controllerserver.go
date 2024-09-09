@@ -20,7 +20,7 @@ import (
 
 	//k8s_v1 "k8s.io/api/core/v1"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -259,6 +259,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		}
 		// if createVolume err and zoneSelection or last preffered
 		if (err != nil && isZoneSpecified) || (err != nil && i == len(req.AccessibilityRequirements.Preferred)-1) {
+			klog.Errorf("CreateVolume::createvolume in Zone %s failed, error is %v", volArg.Zone, err)
 			return nil, err
 		}
 	}
@@ -311,7 +312,7 @@ func getDiskType(volArg *volumeArgs) ([]string, []string, error) {
 				nodeSupportDiskType = append(nodeSupportDiskType, result[1])
 			}
 		}
-		klog.V(5).Infof("CreateVolume:: node support disk types: %v, nodeSelected: %v", nodeSupportDiskType, volArg.NodeSelected)
+		klog.V(2).Infof("CreateVolume:: node support disk types: %v, nodeSelected: %v", nodeSupportDiskType, volArg.NodeSelected)
 	}
 cusDiskType:
 	provisionPerformanceLevel := []string{}

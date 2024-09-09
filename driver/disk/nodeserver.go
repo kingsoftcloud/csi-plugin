@@ -8,7 +8,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -368,9 +368,25 @@ func (d *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 	mnt := req.VolumeCapability.GetMount()
 	switch mnt.FsType {
 	case "xfs":
-		d.mounter.Expand(mnt.FsType, req.VolumePath)
+		ok, err := d.mounter.Expand(mnt.FsType, req.VolumePath)
+		if err != nil {
+			klog.Errorf("expand failed with error: %v, fs type: %s, source: %s", err, "xfs", req.VolumePath)
+			return nil, status.Errorf(codes.Internal, "expand failed with error: %v, fs type: %s, source: %s", err, "xfs", req.VolumePath)
+		}
+		if !ok {
+			klog.Errorf("expand failed, fs type: %s, source: %s", "xfs", devName)
+			return nil, status.Errorf(codes.Internal, "expand failed, fs type: %s, source: %s", "xfs", devName)
+		}
 	case "ext4", "ext3", "ext2":
-		d.mounter.Expand(mnt.FsType, devName)
+		ok, err := d.mounter.Expand(mnt.FsType, devName)
+		if err != nil {
+			klog.Errorf("expand failed with error: %v, fs type: %s, source: %s", err, mnt.FsType, devName)
+			return nil, status.Errorf(codes.Internal, "expand failed with error: %v, fs type: %s, source: %s", err, mnt.FsType, devName)
+		}
+		if !ok {
+			klog.Errorf("expand failed, fs type: %s, source: %s", mnt.FsType, devName)
+			return nil, status.Errorf(codes.Internal, "expand failed, fs type: %s, source: %s", mnt.FsType, devName)
+		}
 	case "":
 		ok, err := d.mounter.Expand("ext4", devName)
 		if err != nil {

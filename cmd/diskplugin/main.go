@@ -2,6 +2,7 @@ package main
 
 import (
 	ebs "csi-plugin/driver/disk"
+	"csi-plugin/driver/ks3"
 	nfs "csi-plugin/driver/nfs"
 	ebsClient "csi-plugin/pkg/ebs-client"
 	"flag"
@@ -17,7 +18,7 @@ import (
 	k8sclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 //func init() {
@@ -25,11 +26,12 @@ import (
 //}
 
 const (
-	EBSdriverName          = "com.ksc.csi.diskplugin"
-	NFSDriverName          = "com.ksc.csi.nfsplugin"
-	DiskNFSMultiDriverName = "com.ksc.csi.diskplugin,com.ksc.csi.nfsplugin"
-	TypePluginVar          = "com.ksc.csi.driverplugin-replace"
-	version                = "2.0.0"
+	EBSdriverName             = "com.ksc.csi.diskplugin"
+	NFSDriverName             = "com.ksc.csi.nfsplugin"
+	KS3DriverName             = "com.ksc.csi.ks3plugin"
+	DiskNFSKS3MultiDriverName = "com.ksc.csi.diskplugin,com.ksc.csi.nfsplugin,com.ksc.csi.ks3plugin"
+	TypePluginVar             = "com.ksc.csi.driverplugin-replace"
+	version                   = "2.0.0"
 )
 
 var (
@@ -51,7 +53,7 @@ var (
 	timeout         = flag.Duration("timeout", 30*time.Second, "Timeout specifies a time limit for requests made by this Client.")
 	//clusterInfoPath = flag.String("cluster-info-path", "/opt/app-agent/arrangement/clusterinfo", "")
 	metric            = flag.Bool("metric", false, "Enable monitoring volume statistics")
-	driverName        = flag.String("driver", DiskNFSMultiDriverName, "CSI Driver, support multi driver and  separated by ','")
+	driverName        = flag.String("driver", DiskNFSKS3MultiDriverName, "CSI Driver, support multi driver and  separated by ','")
 	maxVolumesPerNode = flag.Int64("max-volumes-pernode", 8, "Only EBS: maximum number of volumes that can be attached to node")
 	//nfs
 	mountPermissions             = flag.Uint64("mount-permissions", 0, "mounted folder permissions")
@@ -150,6 +152,10 @@ func main() {
 	util.InitAksk(newK8SClient())
 	multiDriverNames := *driverName
 	driverNames := strings.Split(multiDriverNames, ",")
+	nodeId, err := util.GetSystemUUID()
+	if err != nil {
+		klog.Warningf("nodeid is empty, err: %v", err)
+	}
 	var epName = *endpoint
 	var wg sync.WaitGroup
 	for _, driverName := range driverNames {
@@ -175,6 +181,14 @@ func main() {
 				r := getNFSDriver(ep)
 				r.Run(false)
 			}(epName)
+		case KS3DriverName:
+			klog.V(2).Infof("KS3 Driver start: %s", driverName)
+			go func(ep string) {
+				defer wg.Done()
+				k := ks3.NewDriver(KS3DriverName, version, nodeId)
+				k.Run(ep)
+			}(epName)
+
 		default:
 			klog.Fatalf("CSI start failed, not support driver: %s", driverName)
 		}
