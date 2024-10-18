@@ -1,0 +1,64 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: csi-ks3-launcher
+  namespace: {{ .Values.app.image.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: csi-diskplugin
+  template:
+    metadata:
+      labels:
+        app: csi-diskplugin
+    spec:
+      hostNetwork: true
+      priorityClassName: system-node-critical
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node.kubernetes.io/instance-type
+                    operator: NotIn
+                    values:
+                      - virtual-node
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: ks3-launcher
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          image: hub.kce.ksyun.com/ksyun/ks3-launcher:0.1.0-mp
+          imagePullPolicy: "Always"
+          resources:
+            limits:
+              cpu: "8"
+              memory: 8Gi
+            requests:
+              cpu: 250m
+              memory: 250Mi
+          volumeMounts:
+            - name: launcher-socket-dir
+              mountPath: /tmp
+              mountPropagation: "Bidirectional"
+            - name: pods-mount-dir
+              mountPath: {{ .Values.kubeletDir }}/pods
+              mountPropagation: "Bidirectional"
+            - mountPath: /dev/fuse
+              name: host-fuse
+      volumes:
+        - name: launcher-socket-dir
+          hostPath:
+            path: /etc/csi-ks3
+            type: DirectoryOrCreate
+        - name: pods-mount-dir
+          hostPath:
+            path: {{ .Values.kubeletDir }}/pods
+            type: Directory
+        - name: host-fuse
+          hostPath:
+            path: /dev/fuse

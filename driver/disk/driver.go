@@ -16,6 +16,7 @@ import (
 
 	"context"
 
+	snapClientset "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
 	"google.golang.org/grpc"
 	k8sclient "k8s.io/client-go/kubernetes"
 )
@@ -50,6 +51,7 @@ type GlobalConfig struct {
 	K8sClient     *k8sclient.Clientset
 	EbsClient     ebsClient.StorageService
 	OpenApiConfig *api.ClientConfig
+	SnapClient    *snapClientset.Clientset
 }
 
 var (

@@ -5,7 +5,11 @@ import (
 	"csi-plugin/util"
 	"errors"
 	"fmt"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -39,7 +43,8 @@ const (
 )
 
 type KscEBSControllerServer struct {
-	config Config
+	config   Config
+	recorder record.EventRecorder
 
 	mutex     sync.Mutex
 	k8sClient K8sClientWrapper
@@ -57,8 +62,27 @@ type volumeArgs struct {
 	FsType           string            `json:"fsType"`
 }
 
+// the map of req.Name and csi.Snapshot
+var createdSnapshotMap = map[string]*csi.Snapshot{}
+
+// SnapshotRequestMap snapshot request limit
+var SnapshotRequestMap = map[string]int64{}
+
+// SnapshotRequestInterval snapshot request limit
+var SnapshotRequestInterval = int64(10)
+
 func GetControllerServer(cfg *Config) *KscEBSControllerServer {
+	// parse input snapshot request interval
+	intervalStr := os.Getenv(SnapshotRequestTag)
+	if intervalStr != "" {
+		interval, err := strconv.ParseInt(intervalStr, 10, 64)
+		if err != nil {
+			klog.Fatalf("Input SnapshotRequestTag is illegal: %s", intervalStr)
+			SnapshotRequestInterval = interval
+		}
+	}
 	return &KscEBSControllerServer{
+		recorder:  util.NewEventRecorder(),
 		config:    *cfg,
 		ebsClient: cfg.EbsClient,
 		k8sClient: GetK8sClientWrapper(cfg.K8sClient),
@@ -75,6 +99,8 @@ func (cs *KscEBSControllerServer) getControllerServiceCapabilities() []*csi.Cont
 		csi.ControllerServiceCapability_RPC_GET_VOLUME,
 		csi.ControllerServiceCapability_RPC_VOLUME_CONDITION,
 		csi.ControllerServiceCapability_RPC_LIST_VOLUMES_PUBLISHED_NODES,
+		csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
+		csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 	}
 	if cs.config.EnableVolumeExpansion {
 		cl = append(cl, csi.ControllerServiceCapability_RPC_EXPAND_VOLUME)
@@ -665,8 +691,197 @@ func (cs *KscEBSControllerServer) ControllerGetCapabilities(ctx context.Context,
 	return resp, nil
 }
 
+func getVolumeSnapshotConfig(req *csi.CreateSnapshotRequest) (*ebsClient.CreateSnapshotParams, error) {
+	var ebsParams ebsClient.CreateSnapshotParams
+	if req.Parameters != nil {
+		err := parseSnapshotParameters(req.Parameters, &ebsParams)
+		if err != nil {
+			klog.Errorf("CreateSnapshot:: Snapshot name[%s], parse config failed: %v", req.Name, err)
+			return nil, status.Errorf(codes.InvalidArgument, err.Error())
+		}
+	}
+
+	vsName := req.Parameters[VolumeSnapshotNameKey]
+	vsNameSpace := req.Parameters[VolumeSnapshotNamespaceKey]
+	// volumesnapshot not in parameters, just retrun
+
+	if vsName == "" || vsNameSpace == "" {
+		return &ebsParams, nil
+	}
+
+	volumeSnapShot, err := GlobalConfigVar.SnapClient.SnapshotV1().VolumeSnapshots(vsNameSpace).Get(context.Background(), vsName, metav1.GetOptions{})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get VolumeSnapshot: %s/%s: %v", vsNameSpace, vsName, err)
+	}
+	err = parseSnapshotAnnotations(volumeSnapShot.Annotations, &ebsParams)
+	if err != nil {
+		klog.Errorf("CreateSnapshot:: Snapshot name[%s], parse annotation failed: %v", req.Name, err)
+		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+	}
+	return &ebsParams, nil
+}
+
+func parseSnapshotParameters(params map[string]string, ebsParams *ebsClient.CreateSnapshotParams) (err error) {
+	for k, v := range params {
+		switch k {
+		case SNAPSHOTTYPE:
+			ebsParams.SnapshotType = v
+		case SCHEDULEDDELETETIME:
+			ebsParams.ScheduledDeleteTime = v
+		case SNAPSHOTDESC:
+			ebsParams.SnapShotDesc = v
+		case AUTOSNAPSHOT:
+			ebsParams.AutoSnapshot, _ = strconv.ParseBool(v)
+		}
+	}
+	return nil
+}
+
+// if volumesnapshot have Annotations, use it first.
+func parseSnapshotAnnotations(annotations map[string]string, ebsParams *ebsClient.CreateSnapshotParams) error {
+	snapshotTTL := annotations["storage.ksyun.com/snapshot-ttl"]
+	var err error
+
+	if snapshotTTL != "" {
+		ebsParams.RetentionDays, err = strconv.Atoi(snapshotTTL)
+		if err != nil {
+			return fmt.Errorf("failed to parse annotation snapshot TTL : %w", err)
+		}
+	}
+	return nil
+}
+
 func (cs *KscEBSControllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	// request limit
+	cur := time.Now().Unix()
+	if initTime, ok := SnapshotRequestMap[req.Name]; ok {
+		if cur-initTime < SnapshotRequestInterval {
+			err := fmt.Errorf("CreateSnapshot: Snapshot create request limit %s", req.Name)
+			return nil, err
+		}
+	}
+	SnapshotRequestMap[req.Name] = cur
+
+	// Used for snapshot events
+	snapshotName := req.Parameters[VolumeSnapshotNameKey]
+	snapshotNamespace := req.Parameters[VolumeSnapshotNamespaceKey]
+
+	ref := &v1.ObjectReference{
+		Kind:      "VolumeSnapshot",
+		Name:      snapshotName,
+		UID:       "",
+		Namespace: snapshotNamespace,
+	}
+
+	params, err := getVolumeSnapshotConfig(req)
+	if err != nil {
+		return nil, err
+	}
+
+	klog.Infof("CreateSnapshot:: Starting to create snapshot: %+v", req)
+	sourceVolumeID := strings.Trim(req.GetSourceVolumeId(), " ")
+	klog.Infof("sourceVolumeID is %s", sourceVolumeID)
+	// Need to check for already existing snapshot name
+	snapshotResp, snapNum, err := cs.ebsClient.GetSnapshotsByName(&ebsClient.DescribeSnapshotsReq{
+		SnapshotName: req.GetName(),
+	})
+	switch {
+	case snapNum == 1:
+		// Since err is nil, it means the snapshot with the same name already exists need
+		// to check if the sourceVolumeId of existing snapshot is the same as in new request.
+		existsSnapshot := snapshotResp.Snapshots[0]
+		if existsSnapshot.VolumeID == req.GetSourceVolumeId() {
+			csiSnapshot, err := formatCSISnapshot(existsSnapshot)
+			if err != nil {
+				return nil, err
+			}
+			klog.Infof("CreateSnapshot:: Snapshot already created: name[%s], sourceId[%s], status[%v]", req.Name, req.GetSourceVolumeId(), csiSnapshot.ReadyToUse)
+			if csiSnapshot.ReadyToUse {
+				str := fmt.Sprintf("VolumeSnapshot: name: %s, id: %s is ready to use.", existsSnapshot.SnapshotName, existsSnapshot.SnapshotID)
+				util.CreateEvent(cs.recorder, ref, v1.EventTypeNormal, snapshotCreatedSuccessfully, str)
+				delete(SnapshotRequestMap, req.Name)
+			}
+			return &csi.CreateSnapshotResponse{
+				Snapshot: csiSnapshot,
+			}, nil
+		}
+		klog.Errorf("CreateSnapshot:: Snapshot already exist with same name: name[%s],volumeID[%s]", req.Name, existsSnapshot.VolumeID)
+		err := status.Errorf(codes.AlreadyExists, "snapshot with the same name: %s but with different SourceVolumeId already exist", req.GetName())
+		util.CreateEvent(cs.recorder, ref, v1.EventTypeWarning, snapshotAlreadyExist, err.Error())
+		return nil, err
+	case snapNum > 1:
+		klog.Error("CreateSnapshot:: Find Snapshot name[%s], but get more than 1 instance", req.Name)
+		err := status.Error(codes.Internal, "CreateSnapshot: get snapshot more than 1 instance")
+		util.CreateEvent(cs.recorder, ref, v1.EventTypeWarning, snapshotTooMany, err.Error())
+		return nil, err
+	case err != nil:
+		klog.Errorf("CreateSnapshot:: Expect to find Snapshot name[%s], but get error: %v", req.Name, err)
+		e := status.Errorf(codes.Internal, "CreateSnapshot: get snapshot with error: %s", err.Error())
+		util.CreateEvent(cs.recorder, ref, v1.EventTypeWarning, snapshotCreateError, e.Error())
+		return nil, e
+	}
+
+	// init createSnapshotRequest and parameters
+	createAt := timestamppb.Now()
+	params.VolumeID = sourceVolumeID
+	params.SnapshotName = req.Name
+	snapshotResquest := requestAndCreateSnapshot(params)
+	snapshotResponse, err := cs.ebsClient.CreateSnapshot(snapshotResquest)
+
+	if err != nil {
+		klog.Errorf("CreateSnapshot:: CreateSnapshot failed: snapshotName[%s],sourceId[%s], error[%s]", req.Name, req.GetSourceVolumeId(), err.Error())
+		util.CreateEvent(cs.recorder, ref, v1.EventTypeWarning, snapshotCreateError, err.Error())
+		return nil, err
+	}
+
+	disks, _ := cs.ebsClient.GetVolume(&ebsClient.ListVolumesReq{
+		VolumeIds: []string{sourceVolumeID},
+	})
+
+	str := fmt.Sprintf("CreateSnapshot:: Snapshot created successful: snapshotName[%s], sourceId[%s], snapshotId[%s]", req.Name, req.GetSourceVolumeId(), snapshotResponse.SnapshotID)
+	klog.Info(str)
+	csiSnapshot := &csi.Snapshot{
+		SnapshotId:     snapshotResponse.SnapshotID,
+		SourceVolumeId: sourceVolumeID,
+		CreationTime:   createAt,
+		ReadyToUse:     false, // even if instant access is available, the snapshot is not ready to use immediately
+		SizeBytes:      util.Gi2Bytes(disks.Size),
+	}
+
+	createdSnapshotMap[req.Name] = csiSnapshot
+	util.CreateEvent(cs.recorder, ref, v1.EventTypeNormal, snapshotCreatedSuccessfully, str)
+	return &csi.CreateSnapshotResponse{
+		Snapshot: csiSnapshot,
+	}, nil
+}
+
+func formatCSISnapshot(ebsSnapshot *ebsClient.Snapshot) (*csi.Snapshot, error) {
+	t, err := time.Parse("2006-01-02 15:04:05", ebsSnapshot.CreateTime)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to parse snapshot create time: %s", ebsSnapshot.CreateTime)
+	}
+	sizeGb := ebsSnapshot.Size
+	sizeBytes := util.Gi2Bytes(int64(sizeGb))
+	return &csi.Snapshot{
+		SnapshotId:     ebsSnapshot.SnapshotID,
+		SourceVolumeId: ebsSnapshot.VolumeID,
+		SizeBytes:      sizeBytes,
+		CreationTime:   &timestamppb.Timestamp{Seconds: t.Unix()},
+		ReadyToUse:     ebsSnapshot.SnapshotStatus == "available",
+	}, nil
+}
+
+func requestAndCreateSnapshot(params *ebsClient.CreateSnapshotParams) *ebsClient.CreateSnapshotReq {
+	createSnapshotRequest := &ebsClient.CreateSnapshotReq{}
+	createSnapshotRequest.VolumeId = params.VolumeID
+	createSnapshotRequest.SnapshotName = params.SnapshotName
+	if params.RetentionDays != 0 {
+		createSnapshotRequest.ScheduledDeleteTime = time.Now().Add(time.Duration(params.RetentionDays) * 24 * time.Hour).Format("2006-01-02 15:04:05")
+	}
+	createSnapshotRequest.SnapshotDesc = "Created by KCE CSI"
+	createSnapshotRequest.AutoSnapshot = strconv.FormatBool(params.AutoSnapshot)
+	createSnapshotRequest.SnapshotType = params.SnapshotType
+	return createSnapshotRequest
 }
 
 func (cs *KscEBSControllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {

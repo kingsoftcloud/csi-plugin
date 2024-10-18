@@ -311,3 +311,38 @@ func validateReqParams(regexpType RegexpType, regexpStr string) bool {
 	}
 	return r.Match([]byte(regexpStr))
 }
+
+func (cli *Client) CreateSnapshot(createSnapshotReq *CreateSnapshotReq) (*CreateSnapshotResp, error) {
+	createSnapshotResp := &CreateSnapshotResp{}
+	query := createSnapshotReq.ToQuery()
+	resp, err := cli.DoRequest(serviceName, query)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(resp, &createSnapshotResp)
+	if err != nil {
+		klog.Error("Error decoding json: ", err)
+	}
+
+	return createSnapshotResp, nil
+}
+
+func (cli *Client) GetSnapshotsByName(getSnapshotReq *DescribeSnapshotsReq) (*DescribeSnapshotsResp, int, error) {
+	describeSnapshotsResp := &DescribeSnapshotsResp{}
+
+	query := getSnapshotReq.ToQuery()
+	resp, err := cli.DoRequest(serviceName, query)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err = json.Unmarshal(resp, describeSnapshotsResp); err != nil {
+		return nil, 0, err
+	}
+	if len(describeSnapshotsResp.Snapshots) == 0 {
+		return describeSnapshotsResp, 0, err
+	}
+	if len(describeSnapshotsResp.Snapshots) > 1 {
+		return describeSnapshotsResp, len(describeSnapshotsResp.Snapshots), err
+	}
+	return describeSnapshotsResp, 1, nil
+}

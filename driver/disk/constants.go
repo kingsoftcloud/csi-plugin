@@ -50,4 +50,40 @@ const (
 
 	InstanceUuid           = "appengine.sdns.ksyun.com/instance-uuid"
 	NodeAnnotationNodeType = "appengine.sdns.ksyun.com/node-type"
+
+	// DiskSnapshotID means snapshot id
+	DiskSnapshotID = "csi.kingsoftcloud.com/disk-snapshot-id"
+	// InstallSnapshotCRD tag
+	InstallSnapshotCRD = "INSTALL_SNAPSHOT_CRD"
+	// SnapshotRequestTag interval limit
+	SnapshotRequestTag = "SNAPSHOT_REQUEST_INTERVAL"
+	// DefaultVolumeSnapshotClass ...
+	DefaultVolumeSnapshotClass = "ksyun-disk-snapshot"
+)
+
+// constants of keys in volume snapshot parameters
+const (
+	VolumeSnapshotNamespaceKey = "csi.storage.k8s.io/volumesnapshot/namespace"
+	VolumeSnapshotNameKey      = "csi.storage.k8s.io/volumesnapshot/name"
+)
+
+// keys used in CreateSnapshotRequest.Parameters
+const (
+	SNAPSHOTTYPE        = "snapshotType"
+	SCHEDULEDDELETETIME = "scheduledDeleteTime"
+	SNAPSHOTDESC        = "snapShotDesc"
+	AUTOSNAPSHOT        = "autpSnapshot"
+
+	//snapshotTooMany means that the previous Snapshot is greater than 1
+	snapshotTooMany string = "SnapshotTooMany"
+	//snapshotAlreadyExist means that the snapshot already exists
+	snapshotAlreadyExist string = "SnapshotAlreadyExist"
+	//snapshotCreateError means that the create snapshot error occurred
+	snapshotCreateError string = "SnapshotCreateError"
+	//snapshotCreatedSuccessfully means that the create snapshot success
+	snapshotCreatedSuccessfully string = "SnapshotCreatedSuccessfully"
+	//snapshotDeleteError means that the delete snapshot error occurred
+	snapshotDeleteError string = "SnapshotDeleteError"
+	//snapshotDeletedSuccessfully means that the delete snapshot success
+	snapshotDeletedSuccessfully string = "SnapshotDeletedSuccessfully"
 )

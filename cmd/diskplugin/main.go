@@ -5,6 +5,8 @@ import (
 	"csi-plugin/driver/ks3"
 	nfs "csi-plugin/driver/nfs"
 	ebsClient "csi-plugin/pkg/ebs-client"
+	snapClientset "github.com/kubernetes-csi/external-snapshotter/client/v4/clientset/versioned"
+
 	"flag"
 	"os"
 	"strings"
@@ -83,6 +85,27 @@ func newK8SClient() *k8sclient.Clientset {
 	return clientset
 }
 
+func newSnapClient() *snapClientset.Clientset {
+	var config *rest.Config
+	var err error
+	if *master != "" || *kubeconfig != "" {
+		klog.V(2).Infof("Either master or kubeconfig specified. building kube config from that..")
+		config, err = clientcmd.BuildConfigFromFlags(*master, *kubeconfig)
+	} else {
+		klog.V(5).Infof("Building kube configs for running in cluster...")
+		config, err = rest.InClusterConfig()
+	}
+	if err != nil {
+		klog.Fatalf("Failed to create config: %v", err)
+	}
+	clientset, err := snapClientset.NewForConfig(config)
+	if err != nil {
+		klog.Fatalf("Failed to create client: %v", err)
+	}
+
+	return clientset
+}
+
 type ClusterInfo struct {
 	AccountID int64  `json:"user_id"`
 	UUID      string `json:"cluster_uuid"`
@@ -100,7 +123,7 @@ func getEBSDriver(epName string) *ebs.Driver {
 	}
 	ebs.GlobalConfigVar.K8sClient = newK8SClient()
 	ebs.GlobalConfigVar.EbsClient = ebsClient.New(ebs.GlobalConfigVar.OpenApiConfig)
-
+	ebs.GlobalConfigVar.SnapClient = newSnapClient()
 	cfg := &ebs.Config{
 		EndPoint:               epName,
 		EnableNodeServer:       *nodeServer,

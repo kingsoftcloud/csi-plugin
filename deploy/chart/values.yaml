@@ -1,0 +1,38 @@
+
+# app for k8s resource info
+app:
+  priorityClassName:  system-node-critical
+  image:
+    registry: hub.kce.ksyun.com
+    pullPolicy: IfNotPresent
+    namespace: kube-system
+    driver: com.ksc.csi.diskplugin,com.ksc.csi.nfsplugin,com.ksc.csi.ks3plugin
+  register:
+    name: csi-node-driver-registrar
+    version: v2.2.0-mp
+  provisioner:
+    name: disk-provisioner
+    version: v2.2.2-mp
+  attacher:
+    name: csi-attacher
+    version: v3.2.1-mp
+  resizer:
+    name: csi-resizer
+    version: v1.2.0-mp
+  diskplugin:
+    name: csi-diskplugin
+    version: 1.8.13-mp
+extraArgs:
+    sts:
+        v: 2
+    ds: 
+        v: 2
+        metric: false
+        max-volumes-pernode: 8
+
+controller:
+  enabled: true
+  replicas: 2
+
+
+kubeletDir: /data/kubelet
