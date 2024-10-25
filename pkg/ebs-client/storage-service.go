@@ -22,7 +22,9 @@ type StorageService interface {
 	DescribeInstanceVolumes(describeInstanceVolumesReq *DescribeInstanceVolumesReq) (*InstanceVolumes, error)
 
 	CreateSnapshot(*CreateSnapshotReq) (*CreateSnapshotResp, error)
+	GetSnapshot(*DescribeSnapshotsReq) (*Snapshot, error)
 	GetSnapshotsByName(*DescribeSnapshotsReq) (*DescribeSnapshotsResp, int, error)
+	DeleteSnapshots(req *DeleteSnapshotsReq) (*DeleteSnapshotsResp, error)
 	//DescribeSnapshots(describeSnapshotsReq *DescribeSnapshotsReq)(*)
 }
 
@@ -402,9 +404,6 @@ type CreateSnapshotResp struct {
 type DescribeSnapshotsResp struct {
 	RequestId string      `json:"RequestId"`
 	Snapshots []*Snapshot `json:"Snapshots"`
-	Pages     struct {
-		TotalCount int `json:"totalCount"`
-	} `json:"Page"`
 }
 
 func (cs *CreateSnapshotReq) ToQuery() string {
@@ -448,4 +447,18 @@ func (ds *DescribeSnapshotsReq) ToQuery() string {
 		querySlice = append(querySlice, fmt.Sprintf("InstanceId=%v", ds.InstanceId))
 	}
 	return strings.Join(querySlice, Separator)
+}
+
+type DeleteSnapshotsReq struct {
+	SnapshotId string
+}
+
+func (ds *DeleteSnapshotsReq) ToQuery() string {
+	querySlice := []string{"Action=DeleteSnapshots", fmt.Sprintf("SnapshotId=%v", ds.SnapshotId)}
+	return strings.Join(querySlice, Separator)
+}
+
+type DeleteSnapshotsResp struct {
+	RequestId string `json:"RequestId"`
+	Return    bool   `json:"Return"`
 }

@@ -885,7 +885,44 @@ func requestAndCreateSnapshot(params *ebsClient.CreateSnapshotParams) *ebsClient
 }
 
 func (cs *KscEBSControllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	// Check arguments
+	snapshotID := req.GetSnapshotId()
+	klog.Infof("DeleteSnapshot:: starting delete snapshot %s", snapshotID)
+
+	// Check Snapshot exist
+	snapshot, err := cs.ebsClient.GetSnapshot(&ebsClient.DescribeSnapshotsReq{
+		SnapshotId: req.GetSnapshotId(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if snapshot == nil {
+		klog.Infof("DeleteSnapshot:: snapshot not exist for expect %s, return successful", snapshotID)
+		return &csi.DeleteSnapshotResponse{}, nil
+	}
+
+	ref := &v1.ObjectReference{
+		Kind:      "VolumeSnapshotContent",
+		Name:      snapshot.SnapshotName,
+		UID:       "",
+		Namespace: "",
+	}
+
+	klog.Infof("DeleteSnapshot: Snapshot %s exist with Info: %+v, %+v", snapshotID, snapshot, err)
+	response, err := cs.ebsClient.DeleteSnapshots(&ebsClient.DeleteSnapshotsReq{
+		SnapshotId: snapshotID,
+	})
+	if err != nil {
+		util.CreateEvent(cs.recorder, ref, v1.EventTypeWarning, snapshotDeleteError, err.Error())
+		return nil, err
+	}
+
+	delete(createdSnapshotMap, snapshot.SnapshotName)
+	str := fmt.Sprintf("DeleteSnapshot:: Successfully delete snapshot %s, requestId: %s", snapshotID, response.RequestId)
+	klog.Info(str)
+	util.CreateEvent(cs.recorder, ref, v1.EventTypeNormal, snapshotDeletedSuccessfully, str)
+	return &csi.DeleteSnapshotResponse{}, nil
 }
 
 func (cs *KscEBSControllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
