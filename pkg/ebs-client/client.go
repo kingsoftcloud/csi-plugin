@@ -368,6 +368,21 @@ func (cli *Client) GetSnapshot(getSnapshotReq *DescribeSnapshotsReq) (*Snapshot,
 	return snapshot.Snapshots[0], nil
 }
 
+func (cli *Client) ListSnapshots(listSnapshotReq *DescribeSnapshotsReq) (*DescribeSnapshotsResp, error) {
+	snapshot := &DescribeSnapshotsResp{}
+
+	query := listSnapshotReq.ToQuery()
+	resp, err := cli.DoRequest(serviceName, query)
+	if err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(resp, snapshot); err != nil {
+		return nil, err
+	}
+
+	return snapshot, nil
+}
+
 func (cli *Client) DeleteSnapshots(deleteSnapshotsReq *DeleteSnapshotsReq) (*DeleteSnapshotsResp, error) {
 	deleteSnapshotsResp := &DeleteSnapshotsResp{}
 	query := deleteSnapshotsReq.ToQuery()

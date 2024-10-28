@@ -926,7 +926,51 @@ func (cs *KscEBSControllerServer) DeleteSnapshot(ctx context.Context, req *csi.D
 }
 
 func (cs *KscEBSControllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+	klog.Infof("ListSnapshots:: starting list snapshots with args: %+v", req)
+	snapshotID := req.GetSnapshotId()
+	if len(snapshotID) > 0 {
+		snapshot, err := cs.ebsClient.GetSnapshot(&ebsClient.DescribeSnapshotsReq{
+			SnapshotId: snapshotID,
+		})
+		if err != nil {
+			klog.Infof("CreateSnapshot:: failed to find Snapshot id %s: %v", req.SnapshotId, err)
+			e := status.Errorf(codes.Internal, "ListSnapshots:: failed to find Snapshot id %s: %v", req.SnapshotId, err.Error())
+			return nil, e
+		}
+		snapshots := make([]*ebsClient.Snapshot, 0, 1)
+		if snapshot != nil {
+			snapshots = append(snapshots, snapshot)
+		}
+		return newListSnapshotsResponse(snapshots)
+	}
+	volumeID := req.GetSourceVolumeId()
+	if volumeID == "" {
+		return nil, status.Error(codes.InvalidArgument, "At least one of snapshot ID, volume ID must be specified")
+	}
+	snapshots, err := cs.ebsClient.ListSnapshots(&ebsClient.DescribeSnapshotsReq{
+		VolumeId: volumeID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return newListSnapshotsResponse(snapshots.Snapshots)
+}
+
+func newListSnapshotsResponse(snapshots []*ebsClient.Snapshot) (*csi.ListSnapshotsResponse, error) {
+	var entries []*csi.ListSnapshotsResponse_Entry
+	for _, snapshot := range snapshots {
+		csiSnapshot, err := formatCSISnapshot(snapshot)
+		if err != nil {
+			return nil, err
+		}
+		entry := &csi.ListSnapshotsResponse_Entry{
+			Snapshot: csiSnapshot,
+		}
+		entries = append(entries, entry)
+	}
+	return &csi.ListSnapshotsResponse{
+		Entries: entries,
+	}, nil
 }
 
 func (cs *KscEBSControllerServer) ControllerGetVolume(ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {

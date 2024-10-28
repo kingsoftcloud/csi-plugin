@@ -23,6 +23,7 @@ type StorageService interface {
 
 	CreateSnapshot(*CreateSnapshotReq) (*CreateSnapshotResp, error)
 	GetSnapshot(*DescribeSnapshotsReq) (*Snapshot, error)
+	ListSnapshots(resp *DescribeSnapshotsReq) (*DescribeSnapshotsResp, error)
 	GetSnapshotsByName(*DescribeSnapshotsReq) (*DescribeSnapshotsResp, int, error)
 	DeleteSnapshots(req *DeleteSnapshotsReq) (*DeleteSnapshotsResp, error)
 	//DescribeSnapshots(describeSnapshotsReq *DescribeSnapshotsReq)(*)
