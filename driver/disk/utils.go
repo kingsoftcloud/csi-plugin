@@ -457,7 +457,7 @@ func validateDiskPerformaceLevel(opts map[string]string) (performaceLevel string
 	return pl, nil
 }
 
-func getCsiVolumeInfo(diskType string, volumeId string, size int64, volumeContext map[string]string, zone string) *csi.Volume {
+func getCsiVolumeInfo(diskType string, volumeId string, size int64, volumeContext map[string]string, zone string, contextSource *csi.VolumeContentSource) *csi.Volume {
 	accessibleTopology := []*csi.Topology{
 		{
 			Segments: map[string]string{
@@ -502,6 +502,7 @@ func getCsiVolumeInfo(diskType string, volumeId string, size int64, volumeContex
 		VolumeId:           volumeId,
 		VolumeContext:      volumeContext,
 		AccessibleTopology: accessibleTopology,
+		ContentSource:      contextSource,
 	}
 
 	return tmpVol

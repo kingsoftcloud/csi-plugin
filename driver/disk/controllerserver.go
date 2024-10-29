@@ -149,6 +149,25 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 	//}
 
 	// check parameters
+	snapshotID := ""
+	volumeSource := req.GetVolumeContentSource()
+	if volumeSource != nil {
+		if _, ok := volumeSource.GetType().(*csi.VolumeContentSource_Snapshot); !ok {
+			return nil, status.Error(codes.InvalidArgument, "CreateVolume: unsupported VolumeContentSource type")
+		}
+		sourceSnapshot := volumeSource.GetSnapshot()
+		if sourceSnapshot == nil {
+			return nil, status.Error(codes.InvalidArgument, "CreateVolume: get empty snapshot from volumeContentSource")
+		}
+		snapshotID = sourceSnapshot.GetSnapshotId()
+	}
+	// set snapshotId if pvc labels/annotation set it.
+	if snapshotID == "" {
+		if value, ok := req.GetParameters()[DiskSnapshotID]; ok && value != "" {
+			snapshotID = value
+		}
+	}
+
 	if req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "CreateVolume: Volume name must be provided")
 	}
@@ -249,7 +268,7 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		}
 	}
 
-	createVolumeReq, diskType, err := preCreateVolume(req.GetName(), size, volArg, parameters)
+	createVolumeReq, diskType, err := preCreateVolume(req.GetName(), snapshotID, size, volArg, parameters)
 
 	purchaseTime, err := strconv.Atoi(parameters.Get("purchasetime", defaultPurchaseTime))
 	if err != nil {
@@ -290,12 +309,24 @@ func (cs *KscEBSControllerServer) CreateVolume(ctx context.Context, req *csi.Cre
 		}
 	}
 
-	tmpVol := getCsiVolumeInfo(diskType, createVolumeResp.VolumeId, size, volumeContext, volArg.Zone)
+	// Set VolumeContentSource
+	var src *csi.VolumeContentSource
+	if snapshotID != "" {
+		src = &csi.VolumeContentSource{
+			Type: &csi.VolumeContentSource_Snapshot{
+				Snapshot: &csi.VolumeContentSource_SnapshotSource{
+					SnapshotId: snapshotID,
+				},
+			},
+		}
+	}
+
+	tmpVol := getCsiVolumeInfo(diskType, createVolumeResp.VolumeId, size, volumeContext, volArg.Zone, src)
 
 	return &csi.CreateVolumeResponse{Volume: tmpVol}, nil
 }
 
-func preCreateVolume(diskName string, size int64, volArg *volumeArgs, parameters SuperMapString) (*ebsClient.CreateVolumeReq, string, error) {
+func preCreateVolume(diskName string, snapshotID string, size int64, volArg *volumeArgs, parameters SuperMapString) (*ebsClient.CreateVolumeReq, string, error) {
 	createVolumeRequest := &ebsClient.CreateVolumeReq{}
 	createVolumeRequest.VolumeName = diskName
 	createVolumeRequest.Size = size / GB
@@ -304,6 +335,10 @@ func preCreateVolume(diskName string, size int64, volArg *volumeArgs, parameters
 	createVolumeRequest.Tags = volArg.DiskTags
 	createVolumeRequest.ChargeType = parameters.Get("chargetype", defaultChargeType)
 	createVolumeRequest.ProjectId = parameters.Get("projectid", "")
+
+	if snapshotID != "" {
+		createVolumeRequest.SnapshotId = snapshotID
+	}
 
 	diskTypes, diskPLs, err := getDiskType(volArg)
 	klog.V(5).Infof("createDisk: diskName: %s, valid disktype: %v, valid diskpls: %v", diskName, diskTypes, diskPLs)

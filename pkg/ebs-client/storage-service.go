@@ -104,6 +104,7 @@ type CreateVolumeReq struct {
 	VolumeName       string
 	VolumeType       string
 	VolumeDesc       string
+	SnapshotId       string
 	Size             int64
 	AvailabilityZone string
 	ChargeType       string
@@ -153,6 +154,10 @@ func (cv *CreateVolumeReq) ToQuery() string {
 
 	if cv.ProjectId != "" {
 		querySlice = append(querySlice, fmt.Sprintf("ProjectId=%v", cv.ProjectId))
+	}
+
+	if cv.SnapshotId != "" {
+		querySlice = append(querySlice, fmt.Sprintf("SnapshotId=%v", cv.SnapshotId))
 	}
 
 	if cv.Size <= MIN_VOLUME_SIZE {
