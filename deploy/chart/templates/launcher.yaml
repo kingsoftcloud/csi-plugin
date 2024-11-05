@@ -32,7 +32,7 @@ spec:
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: hub.kce.ksyun.com/ksyun/ks3-launcher:0.1.0-mp
+          image: {{ include "imageSpec" (list .Values.app.image "launcher") }}
           imagePullPolicy: "Always"
           resources:
             limits:

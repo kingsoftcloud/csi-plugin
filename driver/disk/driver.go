@@ -146,12 +146,15 @@ func ParseEndpoint(ep string) (string, string, error) {
 
 func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	level := klog.Level(getLogLevel(info.FullMethod))
-	klog.V(level).Infof("GRPC call: %s", info.FullMethod)
-	klog.V(level).Infof("GRPC request: %s", protosanitizer.StripSecrets(req))
+
+	if ShoudLog(info.FullMethod) {
+		klog.V(level).Infof("GRPC call: %s", info.FullMethod)
+		klog.V(level).Infof("GRPC request: %s", protosanitizer.StripSecrets(req))
+	}
 	resp, err := handler(ctx, req)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "Snapshot create request limit") {
 		klog.Errorf("GRPC error: %v", err)
-	} else {
+	} else if ShoudLog(info.FullMethod) {
 		klog.V(level).Infof("GRPC response: %s", protosanitizer.StripSecrets(resp))
 	}
 	return resp, err

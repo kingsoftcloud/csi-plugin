@@ -60,3 +60,10 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "imageSpec" -}}
+{{- $v := index . 0 -}}
+{{- $container := index . 1 -}}
+{{- $cv := get $v $container -}}
+{{ printf "%s/%s:%s" ($cv.registry | default $v.registry) $cv.repo $cv.tag | quote}}
+{{- end -}}

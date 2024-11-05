@@ -460,7 +460,7 @@ type DeleteSnapshotsReq struct {
 }
 
 func (ds *DeleteSnapshotsReq) ToQuery() string {
-	querySlice := []string{"Action=DeleteSnapshots", fmt.Sprintf("SnapshotId=%v", ds.SnapshotId)}
+	querySlice := []string{"Action=DeleteSnapshot", fmt.Sprintf("SnapshotId=%v", ds.SnapshotId)}
 	return strings.Join(querySlice, Separator)
 }
 

@@ -7,21 +7,34 @@ app:
     pullPolicy: IfNotPresent
     namespace: kube-system
     driver: com.ksc.csi.diskplugin,com.ksc.csi.nfsplugin,com.ksc.csi.ks3plugin
-  register:
-    name: csi-node-driver-registrar
-    version: v2.2.0-mp
-  provisioner:
-    name: disk-provisioner
-    version: v2.2.2-mp
-  attacher:
-    name: csi-attacher
-    version: v3.2.1-mp
-  resizer:
-    name: csi-resizer
-    version: v1.2.0-mp
-  diskplugin:
-    name: csi-diskplugin
-    version: 1.8.13-mp
+    controller:
+      repo: yimenghua/csi-diskplugin
+      tag: 1.8.14-mp
+    plugin:
+      repo: yimenghua/csi-diskplugin
+      tag: 1.8.14-mp
+    externalAttacher:
+      repo: ksyun/csi-attacher
+      tag: v3.2.1-mp
+    externalProvisioner:
+      repo: ksyun/csi-provisioner
+      tag: v2.2.2-mp
+    externalResizer:
+      repo: ksyun/csi-resizer
+      tag: v1.2.0-mp
+    externalSnapshotter:
+      repo: ksyun/csi-snapshotter
+      tag: v4.0.0
+    externalSnapshotController:
+      repo: ksyun/snapshot-controller
+      tag: v4.0.0
+    pluginRegistrar:
+      repo: ksyun/csi-node-driver-registrar
+      tag: v2.2.0-mp
+    launcher:
+      repo: ksyun/ks3-launcher
+      tag: 0.1.0-mp
+
 extraArgs:
     sts:
         v: 2

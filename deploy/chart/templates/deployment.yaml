@@ -49,7 +49,7 @@ spec:
           env:
           - name: ADDRESS
             value: /var/lib/csi/sockets/com.ksc.csi.nfsplugin/csi.sock
-          image: {{ .Values.app.image.registry }}/ksyun/csi-provisioner:{{ .Values.app.provisioner.version }}
+          image: {{ include "imageSpec" (list .Values.app.image "externalProvisioner")}}
           imagePullPolicy: IfNotPresent
           name: csi-nfs-provisioner
           resources: 
@@ -63,7 +63,7 @@ spec:
           - mountPath: /var/lib/csi/sockets/com.ksc.csi.nfsplugin/
             name: nfs-socket-dir      
         - name: csi-disk-provisioner
-          image: {{ .Values.app.image.registry }}/ksyun/csi-provisioner:{{ .Values.app.provisioner.version }}
+          image: {{ include "imageSpec" (list .Values.app.image "externalProvisioner") }}
           args:
             - "--feature-gates=Topology=true"
             - "--csi-address=$(ADDRESS)"
@@ -89,7 +89,7 @@ spec:
             - name: disk-socket-dir
               mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
         - name: csi-disk-attacher
-          image:  {{ .Values.app.image.registry }}/ksyun/csi-attacher:{{ .Values.app.attacher.version }}
+          image: {{ include "imageSpec" (list .Values.app.image "externalAttacher") }}
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
@@ -110,9 +110,41 @@ spec:
           volumeMounts:
             - name: disk-socket-dir
               mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
+        - name: csi-snapshotter
+          image: {{ include "imageSpec" (list .Values.app.image "externalSnapshotter") }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 500m
+              memory: 1024Mi
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+            - "--extra-create-metadata=true"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/com.ksc.csi.diskplugin/csi.sock
+          volumeMounts:
+            - name: disk-socket-dir
+              mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
+        - name: csi-snapshot-controller
+          image: {{ include "imageSpec" (list .Values.app.image "externalSnapshotController") }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 500m
+              memory: 1024Mi
+          args:
+            - "--v=2"
+            - "--leader-election=true"
         - name: csi-disk-resizer
           imagePullPolicy: IfNotPresent
-          image:  {{ .Values.app.image.registry }}/ksyun/csi-resizer:{{ .Values.app.resizer.version }}
+          image:  {{ include "imageSpec" (list .Values.app.image "externalResizer") }}
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
@@ -140,6 +172,8 @@ spec:
           - --{{ $key }}={{ $value }}
         {{- end }}  
           env:
+          - name: SNAPSHOT_REQUEST_INTERVAL
+            value: "10"
           - name: CSI_ENDPOINT
             value: unix:///var/lib/csi/sockets/com.ksc.csi.driverplugin-replace/csi.sock
           - name: KUBE_NODE_NAME
@@ -152,7 +186,7 @@ spec:
               configMapKeyRef:
                 key: aksk-conf
                 name: csi-aksk-conf
-          image: {{ .Values.app.image.registry }}/ksyun/csi-diskplugin:{{ .Values.app.diskplugin.version }}
+          image: {{ include "imageSpec" (list .Values.app.image "controller") }}
           imagePullPolicy: Always
           name: csi-diskplugin
           resources:

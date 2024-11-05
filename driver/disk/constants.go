@@ -53,8 +53,6 @@ const (
 
 	// DiskSnapshotID means snapshot id
 	DiskSnapshotID = "csi.kingsoftcloud.com/disk-snapshot-id"
-	// InstallSnapshotCRD tag
-	InstallSnapshotCRD = "INSTALL_SNAPSHOT_CRD"
 	// SnapshotRequestTag interval limit
 	SnapshotRequestTag = "SNAPSHOT_REQUEST_INTERVAL"
 	// DefaultVolumeSnapshotClass ...
