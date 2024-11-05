@@ -29,7 +29,7 @@ push: tag
 	docker push $(BJKSYUNREPOSITORY)/csi-diskplugin:$(VERSION)-$(ARCH)
 
 build-mp:
-	docker buildx build --platform=linux/amd64,linux/arm64 -t hub.kce.ksyun.com/yimenghua/csi-diskplugin:$(VERSION)-mp -f Dockerfile.mp --push .
+	docker buildx build --platform=linux/amd64,linux/arm64 -t hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-mp -f Dockerfile.mp --push .
 build-launcher:
 	docker buildx build --platform=linux/amd64 -t hub.kce.ksyun.com/ksyun/ks3-launcher:0.1.0-mp -f build/Dockerfile.launcher --push .
 
