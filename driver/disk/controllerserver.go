@@ -791,7 +791,7 @@ func (cs *KscEBSControllerServer) CreateSnapshot(ctx context.Context, req *csi.C
 	cur := time.Now().Unix()
 	if initTime, ok := SnapshotRequestMap[req.Name]; ok {
 		if cur-initTime < SnapshotRequestInterval {
-			err := fmt.Errorf("CreateSnapshot: Snapshot create request limit %s", req.Name)
+			err := fmt.Errorf("CreateSnapshot: Repeatedly sending the same creation request within a short period of time, filter this request %s", req.Name)
 			return nil, err
 		}
 	}

@@ -8,10 +8,10 @@ app:
     namespace: kube-system
     driver: com.ksc.csi.diskplugin,com.ksc.csi.nfsplugin,com.ksc.csi.ks3plugin
     controller:
-      repo: yimenghua/csi-diskplugin
+      repo: ksyun/csi-diskplugin
       tag: 1.8.14-mp
     plugin:
-      repo: yimenghua/csi-diskplugin
+      repo: ksyun/csi-diskplugin
       tag: 1.8.14-mp
     externalAttacher:
       repo: ksyun/csi-attacher

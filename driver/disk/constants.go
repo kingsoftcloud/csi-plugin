@@ -70,7 +70,7 @@ const (
 	SNAPSHOTTYPE        = "snapshotType"
 	SCHEDULEDDELETETIME = "scheduledDeleteTime"
 	SNAPSHOTDESC        = "snapShotDesc"
-	AUTOSNAPSHOT        = "autpSnapshot"
+	AUTOSNAPSHOT        = "autoSnapshot"
 
 	//snapshotTooMany means that the previous Snapshot is greater than 1
 	snapshotTooMany string = "SnapshotTooMany"
