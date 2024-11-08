@@ -1,0 +1,230 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: csi-controller
+  namespace: {{ .Values.app.image.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: csi-controller
+  replicas: {{ .Values.controller.replicas }}
+  template:
+    metadata:
+      labels:
+        app: csi-controller
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - csi-controller
+                topologyKey: kubernetes.io/hostname
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+          key: node-role.kubernetes.io/master
+        - effect: NoSchedule
+          operator: Exists
+          key: node-role.kubernetes.io/control-plane
+    {{- if semverCompare ">=1.19" .Capabilities.KubeVersion.Version }}
+      priorityClassName: {{ .Values.app.priorityClassName }}
+    {{- end }}
+      serviceAccount: csi-controller-sa
+      containers:
+        - args:
+          - --feature-gates=Topology=true
+          - --csi-address=$(ADDRESS)
+          - --v=5
+          - --timeout=20s
+          - --retry-interval-start=2s
+          - "--volume-name-prefix=kfs"
+          - "--leader-election=true"
+          - "--leader-election-namespace=kube-system"
+          env:
+          - name: ADDRESS
+            value: /var/lib/csi/sockets/com.ksc.csi.nfsplugin/csi.sock
+          image: {{ include "imageSpec" (list .Values.app.image "externalProvisioner")}}
+          imagePullPolicy: IfNotPresent
+          name: csi-nfs-provisioner
+          resources: 
+              limits:
+                cpu: 500m
+                memory: 400Mi
+              requests:
+                cpu: 10m
+                memory: 20Mi     
+          volumeMounts:
+          - mountPath: /var/lib/csi/sockets/com.ksc.csi.nfsplugin/
+            name: nfs-socket-dir      
+        - name: csi-disk-provisioner
+          image: {{ include "imageSpec" (list .Values.app.image "externalProvisioner") }}
+          args:
+            - "--feature-gates=Topology=true"
+            - "--csi-address=$(ADDRESS)"
+            - "--v=5"
+            - "--timeout=30s"
+            - "--retry-interval-start=3s"
+            - "--leader-election=true"
+            - "--leader-election-namespace=kube-system"
+            - "--volume-name-prefix=disk"
+            - "--extra-create-metadata=true"          
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/com.ksc.csi.diskplugin/csi.sock
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 500m
+              memory: 400Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi             
+          volumeMounts:
+            - name: disk-socket-dir
+              mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
+        - name: csi-disk-attacher
+          image: {{ include "imageSpec" (list .Values.app.image "externalAttacher") }}
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--timeout=20s"
+            - "--retry-interval-start=2s"
+            - "--leader-election=true"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/com.ksc.csi.diskplugin/csi.sock
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 500m
+              memory: 400Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          volumeMounts:
+            - name: disk-socket-dir
+              mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
+        - name: csi-snapshotter
+          image: {{ include "imageSpec" (list .Values.app.image "externalSnapshotter") }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 500m
+              memory: 1024Mi
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+            - "--extra-create-metadata=true"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/com.ksc.csi.diskplugin/csi.sock
+          volumeMounts:
+            - name: disk-socket-dir
+              mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
+        - name: csi-snapshot-controller
+          image: {{ include "imageSpec" (list .Values.app.image "externalSnapshotController") }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 500m
+              memory: 1024Mi
+          args:
+            - "--v=2"
+            - "--leader-election=true"
+        - name: csi-disk-resizer
+          imagePullPolicy: IfNotPresent
+          image:  {{ include "imageSpec" (list .Values.app.image "externalResizer") }}
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--timeout=20s"
+            - "--leader-election=true"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/com.ksc.csi.diskplugin/csi.sock
+          resources:
+            limits:
+              cpu: 500m
+              memory: 400Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          volumeMounts:
+            - name: disk-socket-dir
+              mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
+        - args:
+          - --endpoint=$(CSI_ENDPOINT)
+          - --driver={{ .Values.app.image.driver }}
+          - --default-ondelete-policy=retain
+          # - --v=2
+        {{- range $key, $value := .Values.extraArgs.sts }}
+          - --{{ $key }}={{ $value }}
+        {{- end }}  
+          env:
+          - name: SNAPSHOT_REQUEST_INTERVAL
+            value: "10"
+          - name: CSI_ENDPOINT
+            value: unix:///var/lib/csi/sockets/com.ksc.csi.driverplugin-replace/csi.sock
+          - name: KUBE_NODE_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: spec.nodeName
+          - name: AKSK_CONF
+            valueFrom:
+              configMapKeyRef:
+                key: aksk-conf
+                name: csi-aksk-conf
+          image: {{ include "imageSpec" (list .Values.app.image "controller") }}
+          imagePullPolicy: Always
+          name: csi-diskplugin
+          resources:
+            limits:
+              cpu: 500m
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: true
+            capabilities:
+              add:
+              - SYS_ADMIN
+            privileged: true
+          volumeMounts:
+          - mountPath: {{ .Values.kubeletDir }}/pods
+            mountPropagation: Bidirectional
+            name: pods-mount-dir
+          - mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
+            name: disk-socket-dir
+          - mountPath: /var/lib/csi/sockets/com.ksc.csi.nfsplugin/
+            name: nfs-socket-dir
+          - mountPath: /var/lib/csi/sockets/com.ksc.csi.ks3plugin/
+            name: ks3-socket-dir
+          - mountPath: /var/lib/aksk
+            name: aksk
+      volumes:
+      - emptyDir: {}
+        name: disk-socket-dir
+      - emptyDir: {}
+        name: nfs-socket-dir
+      - emptyDir: { }
+        name: ks3-socket-dir
+      - hostPath:
+          path: {{ .Values.kubeletDir }}/pods
+          type: Directory
+        name: pods-mount-dir
+      - name: aksk
+        configMap:
+          name: user-temp-aksk

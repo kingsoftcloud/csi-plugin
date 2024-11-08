@@ -20,6 +20,13 @@ type StorageService interface {
 	ValidateAttachInstance(*ValidateAttachInstanceReq) (*ValidateAttachInstanceResp, error)
 	GetVolumeByName(getVolumesReq *ListVolumesReq) (*ListVolumesResp, error)
 	DescribeInstanceVolumes(describeInstanceVolumesReq *DescribeInstanceVolumesReq) (*InstanceVolumes, error)
+
+	CreateSnapshot(*CreateSnapshotReq) (*CreateSnapshotResp, error)
+	GetSnapshot(*DescribeSnapshotsReq) (*Snapshot, error)
+	ListSnapshots(resp *DescribeSnapshotsReq) (*DescribeSnapshotsResp, error)
+	GetSnapshotsByName(*DescribeSnapshotsReq) (*DescribeSnapshotsResp, int, error)
+	DeleteSnapshots(req *DeleteSnapshotsReq) (*DeleteSnapshotsResp, error)
+	//DescribeSnapshots(describeSnapshotsReq *DescribeSnapshotsReq)(*)
 }
 
 type VolumeStatusType string
@@ -97,6 +104,7 @@ type CreateVolumeReq struct {
 	VolumeName       string
 	VolumeType       string
 	VolumeDesc       string
+	SnapshotId       string
 	Size             int64
 	AvailabilityZone string
 	ChargeType       string
@@ -146,6 +154,10 @@ func (cv *CreateVolumeReq) ToQuery() string {
 
 	if cv.ProjectId != "" {
 		querySlice = append(querySlice, fmt.Sprintf("ProjectId=%v", cv.ProjectId))
+	}
+
+	if cv.SnapshotId != "" {
+		querySlice = append(querySlice, fmt.Sprintf("SnapshotId=%v", cv.SnapshotId))
 	}
 
 	if cv.Size <= MIN_VOLUME_SIZE {
@@ -344,4 +356,115 @@ func (va *DescribeInstanceVolumesReq) ToQuery() string {
 		querySlice = append(querySlice, fmt.Sprintf("InstanceId=%v", va.InstanceId))
 	}
 	return strings.Join(querySlice, Separator)
+}
+
+type Snapshot struct {
+	SnapshotID       string `json:"SnapshotId"`
+	SnapshotName     string `json:"SnapshotName"`
+	VolumeID         string `json:"VolumeId"`
+	Size             int    `json:"Size"`
+	CreateTime       string `json:"CreateTime"`
+	SnapshotStatus   string `json:"SnapshotStatus"`
+	VolumeCategory   string `json:"VolumeCategory"`
+	VolumeName       string `json:"VolumeName"`
+	VolumeType       string `json:"VolumeType"`
+	Progress         string `json:"Progress"`
+	AvailabilityZone string `json:"AvailabilityZone"`
+	VolumeStatus     string `json:"VolumeStatus"`
+	SnapshotType     string `json:"SnapshotType"`
+}
+
+type CreateSnapshotParams struct {
+	VolumeID            string
+	SnapshotType        string
+	SnapshotName        string
+	ScheduledDeleteTime string
+	SnapShotDesc        string
+	AutoSnapshot        bool
+	RetentionDays       int
+}
+
+type DescribeSnapshotsReq struct {
+	VolumeId         string
+	VolumeCategory   string
+	SnapshotId       string
+	AvailabilityZone string
+	SnapshotName     string
+	InstanceId       string
+}
+
+type CreateSnapshotReq struct {
+	VolumeId            string
+	SnapshotName        string
+	SnapshotDesc        string
+	SnapshotType        string
+	AutoSnapshot        string
+	ScheduledDeleteTime string
+}
+
+type CreateSnapshotResp struct {
+	RequestID  string `json:"RequestId"`
+	SnapshotID string `json:"SnapshotId"`
+}
+
+type DescribeSnapshotsResp struct {
+	RequestId string      `json:"RequestId"`
+	Snapshots []*Snapshot `json:"Snapshots"`
+}
+
+func (cs *CreateSnapshotReq) ToQuery() string {
+	querySlice := []string{"Action=CreateSnapshot"}
+	if cs.VolumeId != "" {
+		querySlice = append(querySlice, fmt.Sprintf("VolumeId=%v", cs.VolumeId))
+	}
+	if cs.SnapshotType != "" {
+		querySlice = append(querySlice, fmt.Sprintf("SnapshotType=%v", cs.SnapshotType))
+	}
+	if cs.SnapshotName != "" {
+		querySlice = append(querySlice, fmt.Sprintf("SnapshotName=%v", cs.SnapshotName))
+	}
+	if cs.SnapshotDesc != "" {
+		querySlice = append(querySlice, fmt.Sprintf("SnapshotDesc=%v", cs.SnapshotDesc))
+	}
+	if cs.ScheduledDeleteTime != "" {
+		querySlice = append(querySlice, fmt.Sprintf("ScheduledDeleteTime=%v", cs.ScheduledDeleteTime))
+	}
+	return strings.Join(querySlice, Separator)
+}
+
+func (ds *DescribeSnapshotsReq) ToQuery() string {
+	querySlice := []string{"Action=DescribeSnapshots"}
+	if ds.VolumeId != "" {
+		querySlice = append(querySlice, fmt.Sprintf("VolumeId=%v", ds.VolumeId))
+	}
+	if ds.VolumeCategory != "" {
+		querySlice = append(querySlice, fmt.Sprintf("VolumeCategory=%v", ds.VolumeCategory))
+	}
+	if ds.SnapshotId != "" {
+		querySlice = append(querySlice, fmt.Sprintf("SnapshotId=%v", ds.SnapshotId))
+	}
+	if ds.AvailabilityZone != "" {
+		querySlice = append(querySlice, fmt.Sprintf("AvailabilityZone=%v", ds.AvailabilityZone))
+	}
+	if ds.SnapshotName != "" {
+		querySlice = append(querySlice, fmt.Sprintf("SnapshotName=%v", ds.SnapshotName))
+	}
+	if ds.InstanceId != "" {
+		querySlice = append(querySlice, fmt.Sprintf("InstanceId=%v", ds.InstanceId))
+	}
+	return strings.Join(querySlice, Separator)
+}
+
+type DeleteSnapshotsReq struct {
+	SnapshotId string
+}
+
+func (ds *DeleteSnapshotsReq) ToQuery() string {
+	querySlice := []string{"Action=DeleteSnapshot", fmt.Sprintf("SnapshotId=%v", ds.SnapshotId)}
+	return strings.Join(querySlice, Separator)
+}
+
+type DeleteSnapshotsResp struct {
+	RequestId string `json:"RequestId"`
+	Return    bool   `json:"Return"`
 }

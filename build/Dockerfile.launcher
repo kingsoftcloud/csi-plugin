@@ -1,9 +1,10 @@
-FROM golang:1.19.3 as builder
+FROM --platform=$BUILDPLATFORM golang:1.19.3 AS builder
+ARG TARGETOS TARGETARCH
 COPY . /csi-driver
 WORKDIR /csi-driver
-RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o launcher build/launcher.go
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -a -ldflags '-extldflags "-static"' -o launcher build/launcher.go
 
-FROM phusion/baseimage:focal-1.0.0 as builder2
+FROM phusion/baseimage:focal-1.0.0 AS builder2
 CMD ["/sbin/my_init"]
 RUN apt update && apt install --no-install-recommends --no-install-suggests -y autotools-dev g++ git \
     libcurl4-gnutls-dev libfuse-dev libssl-dev libxml2-dev pkg-config automake make curl fuse libxml2 gdb \

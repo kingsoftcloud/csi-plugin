@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -248,6 +249,27 @@ func getLogLevel(method string) int32 {
 	return 2
 }
 
+const logInterval = 8 * time.Second
+
+var lastLogTime = make(map[string]time.Time)
+var logMutex sync.Mutex
+
+func ShoudLog(method string) bool {
+	if !(method == "/csi.v1.Controller/CreateSnapshot" || method == "/csi.v1.Identity/GetPluginInfo") {
+		return true
+	}
+	logMutex.Lock()
+	defer logMutex.Unlock()
+
+	now := time.Now()
+	lastTime, exists := lastLogTime[method]
+	if !exists || now.Sub(lastTime) > logInterval {
+		lastLogTime[method] = now
+		return true
+	}
+	return false
+}
+
 type K8sClientWrap struct {
 	k8sclient *k8sclient.Clientset
 }
@@ -457,7 +479,7 @@ func validateDiskPerformaceLevel(opts map[string]string) (performaceLevel string
 	return pl, nil
 }
 
-func getCsiVolumeInfo(diskType string, volumeId string, size int64, volumeContext map[string]string, zone string) *csi.Volume {
+func getCsiVolumeInfo(diskType string, volumeId string, size int64, volumeContext map[string]string, zone string, contextSource *csi.VolumeContentSource) *csi.Volume {
 	accessibleTopology := []*csi.Topology{
 		{
 			Segments: map[string]string{
@@ -502,6 +524,7 @@ func getCsiVolumeInfo(diskType string, volumeId string, size int64, volumeContex
 		VolumeId:           volumeId,
 		VolumeContext:      volumeContext,
 		AccessibleTopology: accessibleTopology,
+		ContentSource:      contextSource,
 	}
 
 	return tmpVol

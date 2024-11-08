@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	serviceName              = "ebs"
-	clientDeleteVolumeStatus = "VolumeCanNotFoundError"
+	serviceName                = "ebs"
+	clientDeleteVolumeStatus   = "VolumeCanNotFoundError"
+	clientDeleteSnapshotStatus = "SnapshotCanNotFoundError"
 )
 
 type Client struct {
@@ -310,4 +311,107 @@ func validateReqParams(regexpType RegexpType, regexpStr string) bool {
 		return false
 	}
 	return r.Match([]byte(regexpStr))
+}
+
+func (cli *Client) CreateSnapshot(createSnapshotReq *CreateSnapshotReq) (*CreateSnapshotResp, error) {
+	createSnapshotResp := &CreateSnapshotResp{}
+	query := createSnapshotReq.ToQuery()
+	resp, err := cli.DoRequest(serviceName, query)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(resp, &createSnapshotResp)
+	if err != nil {
+		klog.Error("Error decoding json: ", err)
+	}
+
+	return createSnapshotResp, nil
+}
+
+func (cli *Client) GetSnapshotsByName(getSnapshotReq *DescribeSnapshotsReq) (*DescribeSnapshotsResp, int, error) {
+	describeSnapshotsResp := &DescribeSnapshotsResp{}
+
+	query := getSnapshotReq.ToQuery()
+	resp, err := cli.DoRequest(serviceName, query)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err = json.Unmarshal(resp, describeSnapshotsResp); err != nil {
+		return nil, 0, err
+	}
+	if len(describeSnapshotsResp.Snapshots) == 0 {
+		return describeSnapshotsResp, 0, err
+	}
+	if len(describeSnapshotsResp.Snapshots) > 1 {
+		return describeSnapshotsResp, len(describeSnapshotsResp.Snapshots), err
+	}
+	return describeSnapshotsResp, 1, nil
+}
+
+func (cli *Client) GetSnapshot(getSnapshotReq *DescribeSnapshotsReq) (*Snapshot, error) {
+	snapshot := &DescribeSnapshotsResp{}
+
+	query := getSnapshotReq.ToQuery()
+	resp, err := cli.DoRequest(serviceName, query)
+	if err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(resp, snapshot); err != nil {
+		return nil, err
+	}
+	if len(snapshot.Snapshots) == 0 {
+		return nil, nil
+	}
+	if len(snapshot.Snapshots) > 1 {
+		return nil, status.Errorf(codes.Internal, "find more than one snapshot with id "+getSnapshotReq.SnapshotId)
+	}
+	return snapshot.Snapshots[0], nil
+}
+
+func (cli *Client) ListSnapshots(listSnapshotReq *DescribeSnapshotsReq) (*DescribeSnapshotsResp, error) {
+	snapshot := &DescribeSnapshotsResp{}
+
+	query := listSnapshotReq.ToQuery()
+	resp, err := cli.DoRequest(serviceName, query)
+	if err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(resp, snapshot); err != nil {
+		return nil, err
+	}
+
+	return snapshot, nil
+}
+
+func (cli *Client) DeleteSnapshots(deleteSnapshotsReq *DeleteSnapshotsReq) (*DeleteSnapshotsResp, error) {
+	deleteSnapshotsResp := &DeleteSnapshotsResp{}
+	query := deleteSnapshotsReq.ToQuery()
+	resp, err := cli.DoRequest(serviceName, query)
+	if err != nil {
+		type ErrorResponse struct {
+			RequestId string
+			Error     struct {
+				Code    string
+				Message string
+			}
+		}
+		var errorResp ErrorResponse
+		if e := json.Unmarshal(resp, &errorResp); e != nil {
+			klog.Error("Error decoding json: ", e)
+		}
+		if errorResp.Error.Code == clientDeleteSnapshotStatus {
+			return deleteSnapshotsResp, nil
+		}
+		return nil, err
+	}
+
+	err = json.Unmarshal(resp, &deleteSnapshotsResp)
+	if err != nil {
+		klog.Error("Error decoding json: ", err)
+		return nil, err
+	}
+	if !deleteSnapshotsResp.Return {
+		return nil, errors.New("DeleteSnapshot return false")
+	}
+	return deleteSnapshotsResp, nil
 }
