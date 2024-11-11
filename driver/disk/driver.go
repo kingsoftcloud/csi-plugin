@@ -152,7 +152,7 @@ func logGRPC(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, h
 		klog.V(level).Infof("GRPC request: %s", protosanitizer.StripSecrets(req))
 	}
 	resp, err := handler(ctx, req)
-	if err != nil && !strings.Contains(err.Error(), "Snapshot create request limit") {
+	if err != nil && !strings.Contains(err.Error(), "Repeatedly sending the same creation request within a short period of time") {
 		klog.Errorf("GRPC error: %v", err)
 	} else if ShoudLog(info.FullMethod) {
 		klog.V(level).Infof("GRPC response: %s", protosanitizer.StripSecrets(resp))

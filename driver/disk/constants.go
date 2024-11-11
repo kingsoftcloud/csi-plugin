@@ -71,6 +71,7 @@ const (
 	SCHEDULEDDELETETIME = "scheduledDeleteTime"
 	SNAPSHOTDESC        = "snapShotDesc"
 	AUTOSNAPSHOT        = "autoSnapshot"
+	RETENTIONDAYS       = "retentionDays"
 
 	//snapshotTooMany means that the previous Snapshot is greater than 1
 	snapshotTooMany string = "SnapshotTooMany"
