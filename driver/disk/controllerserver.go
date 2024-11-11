@@ -767,6 +767,11 @@ func parseSnapshotParameters(params map[string]string, ebsParams *ebsClient.Crea
 			ebsParams.SnapShotDesc = v
 		case AUTOSNAPSHOT:
 			ebsParams.AutoSnapshot, _ = strconv.ParseBool(v)
+		case RETENTIONDAYS:
+			ebsParams.RetentionDays, err = strconv.Atoi(v)
+			if err != nil {
+				return fmt.Errorf("failed to parse retentionDays: %w", err)
+			}
 		}
 	}
 	return nil
@@ -911,7 +916,7 @@ func requestAndCreateSnapshot(params *ebsClient.CreateSnapshotParams) *ebsClient
 	createSnapshotRequest.VolumeId = params.VolumeID
 	createSnapshotRequest.SnapshotName = params.SnapshotName
 	if params.RetentionDays != 0 {
-		createSnapshotRequest.ScheduledDeleteTime = time.Now().Add(time.Duration(params.RetentionDays) * 24 * time.Hour).Format("2006-01-02 15:04:05")
+		createSnapshotRequest.ScheduledDeleteTime = time.Now().Add(time.Duration(params.RetentionDays) * 24 * time.Hour).Format("2006-01-02T15:04:05")
 	}
 	createSnapshotRequest.SnapshotDesc = "Created by KCE CSI"
 	createSnapshotRequest.AutoSnapshot = strconv.FormatBool(params.AutoSnapshot)

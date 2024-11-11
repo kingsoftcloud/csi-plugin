@@ -21,5 +21,10 @@ RUN apk update && apk upgrade && \
     apk add eudev && \
     update-ca-certificates
 
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone && \
+    apk del tzdata
+
 COPY --from=build /csi-plugin/bin/csi-diskplugin /csi-diskplugin
 ENTRYPOINT ["/csi-diskplugin"]
