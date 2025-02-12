@@ -150,6 +150,7 @@ spec:
             - "--csi-address=$(ADDRESS)"
             - "--timeout=20s"
             - "--leader-election=true"
+            - "--handle-volume-inuse-error=false"
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/com.ksc.csi.diskplugin/csi.sock

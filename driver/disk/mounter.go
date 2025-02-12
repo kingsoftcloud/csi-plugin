@@ -172,20 +172,20 @@ func (m *mounter) Mount(source, target, fsType string, opts ...string) error {
 	}
 
 	// fsGroup 不生效
-	// if mode10 < 511 {
-	// 	out, err := exec.Command("chmod", []string{"777", target}...).CombinedOutput()
-	// 	if err != nil {
-	// 		return fmt.Errorf("chmod failed: %v cmd: '%s %s' output: %q",
-	// 			err, mountCmd, strings.Join(mountArgs, " "), string(out))
-	// 	}
+	if mode10 < 511 {
+		out, err := exec.Command("chmod", []string{"777", target}...).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("chmod failed: %v cmd: '%s %s' output: %q",
+				err, mountCmd, strings.Join(mountArgs, " "), string(out))
+		}
 
-	// 	out, err = exec.Command("chmod", []string{"g+s", target}...).CombinedOutput()
-	// 	if err != nil {
-	// 		return fmt.Errorf("chmod failed: %v cmd: '%s %s' output: %q",
-	// 			err, mountCmd, strings.Join(mountArgs, " "), string(out))
-	// 	}
+		out, err = exec.Command("chmod", []string{"g+s", target}...).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("chmod failed: %v cmd: '%s %s' output: %q",
+				err, mountCmd, strings.Join(mountArgs, " "), string(out))
+		}
 
-	// }
+	}
 
 	return nil
 }

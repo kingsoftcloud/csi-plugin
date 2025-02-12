@@ -4,7 +4,7 @@ COPY . /csi-driver
 WORKDIR /csi-driver
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -a -ldflags '-extldflags "-static"' -o launcher build/launcher.go
 
-FROM phusion/baseimage:focal-1.0.0 AS builder2
+FROM hub.kce.ksyun.com/ksyun/phusion/baseimage:focal-1.0.0 AS builder2
 CMD ["/sbin/my_init"]
 RUN apt update && apt install --no-install-recommends --no-install-suggests -y autotools-dev g++ git \
     libcurl4-gnutls-dev libfuse-dev libssl-dev libxml2-dev pkg-config automake make curl fuse libxml2 gdb \
@@ -14,7 +14,7 @@ RUN apt update && apt install --no-install-recommends --no-install-suggests -y a
 RUN deplist=$(ldd /usr/local/bin/s3fs | awk '{if (match($3,"/")){ printf("%s "),$3 } }') && mkdir /usr/local/s3fs \
     && cp /usr/local/bin/s3fs /usr/local/s3fs/s3fs && cp $deplist /usr/local/s3fs
 
-FROM phusion/baseimage:focal-1.0.0
+FROM hub.kce.ksyun.com/ksyun/phusion/baseimage:focal-1.0.0
 CMD ["/sbin/my_init"]
 COPY build/syslog-ng /etc/logrotate.d/syslog-ng
 RUN apt update && apt install --no-install-recommends --no-install-suggests -y fuse libxml2 gdb pstack strace \

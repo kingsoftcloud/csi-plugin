@@ -9,10 +9,10 @@ app:
     driver: com.ksc.csi.diskplugin,com.ksc.csi.nfsplugin,com.ksc.csi.ks3plugin
     controller:
       repo: ksyun/csi-diskplugin
-      tag: 1.8.14-mp
+      tag: 1.8.15-mp
     plugin:
       repo: ksyun/csi-diskplugin
-      tag: 1.8.14-mp
+      tag: 1.8.15-mp
     externalAttacher:
       repo: ksyun/csi-attacher
       tag: v3.2.1-mp
