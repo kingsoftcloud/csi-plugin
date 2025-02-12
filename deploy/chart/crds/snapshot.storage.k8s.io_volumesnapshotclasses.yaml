@@ -6,7 +6,12 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.0
     api-approved.kubernetes.io: "https://github.com/kubernetes-csi/external-snapshotter/pull/419"
+    meta.helm.sh/release-name: csi-driver
+    meta.helm.sh/release-namespace: kube-system
+    "helm.sh/resource-policy": keep
   creationTimestamp: null
+  labels:
+    app.kubernetes.io/managed-by: Helm
   name: volumesnapshotclasses.snapshot.storage.k8s.io
 spec:
   group: snapshot.storage.k8s.io

@@ -217,8 +217,8 @@ func (cli *Client) ValidateAttachInstance(validateAttachInstanceReq *ValidateAtt
 	return validateAttachInstanceResp, nil
 }
 
-func WaitVolumeStatus(storageService StorageService, volumeId string, targetStatus VolumeStatusType, nodeID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+func WaitVolumeStatus(storageService StorageService, volumeId string, targetStatus VolumeStatusType, nodeID string, duration time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 
 	ticker := time.NewTicker(time.Second * 5)

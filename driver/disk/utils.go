@@ -572,12 +572,12 @@ func UpdateNode(nodes core_v1.NodeInterface, instanceID string) {
 		//resulting in failure to obtain the instance model.
 		//instanceID := nodeInfo.Annotations[InstanceUuid]
 		instanceInfo, err := GetInstanceInfo(instanceID)
-		instanceType = instanceInfo.InstanceType
-		instanceZone = instanceInfo.AvailabilityZone
-		instanceRegion = strings.TrimSuffix(instanceZone[:len(instanceZone)-1], "-")
 		if err != nil {
 			return
 		}
+		instanceType = instanceInfo.InstanceType
+		instanceZone = instanceInfo.AvailabilityZone
+		instanceRegion = strings.TrimSuffix(instanceZone[:len(instanceZone)-1], "-")
 		//instanceType = nodeInfo.Labels[KceLabelZoneKey]
 		//zone = nodeInfo.Labels[KecLabelZoneKey]
 	}
