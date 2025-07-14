@@ -47,9 +47,3 @@ test:
 	# go test --cover  ./driver/disk
 	go test --cover  ./driver/nfs
 
-build-mp-image:
-	manifest-tool --username admin --password UHdkLUZvci1TZWNyZXRhcnktTWlhbwo= \
-	push from-args --platforms linux/amd64,linux/arm64 \
-	--template hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-ARCH \
-	--target hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-mp \
-	

@@ -49,3 +49,8 @@ controller:
 
 
 kubeletDir: /data/kubelet
+
+aksk:
+  source: configMap  # 或 secret
+  name: user-temp-aksk
+  mountPath: /var/lib/aksk
