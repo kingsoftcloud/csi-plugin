@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.19.3-alpine AS build
+FROM --platform=$BUILDPLATFORM 	hub.kce.ksyun.com/ksyun/golang:1.19.3-alpine AS build
 ARG TARGETOS TARGETARCH
 RUN mkdir /csi-plugin
 ENV GOPROXY=https://goproxy.cn
@@ -6,7 +6,7 @@ COPY . /csi-plugin/
 WORKDIR /csi-plugin
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o ./bin/csi-diskplugin ./cmd/diskplugin
 
-FROM alpine:3.18.4
+FROM hub.kce.ksyun.com/ksyun/alpine:3.18.4
 #RUN sed -i 's/http\:\/\/dl-cdn.alpinelinux.org/https\:\/\/mirrors.aliyun.com/g' /etc/apk/repositories
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
 

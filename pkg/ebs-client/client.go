@@ -217,8 +217,8 @@ func (cli *Client) ValidateAttachInstance(validateAttachInstanceReq *ValidateAtt
 	return validateAttachInstanceResp, nil
 }
 
-func WaitVolumeStatus(storageService StorageService, volumeId string, targetStatus VolumeStatusType, nodeID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+func WaitVolumeStatus(storageService StorageService, volumeId string, targetStatus VolumeStatusType, nodeID string, duration time.Duration, action string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 
 	ticker := time.NewTicker(time.Second * 5)
@@ -245,7 +245,7 @@ func WaitVolumeStatus(storageService StorageService, volumeId string, targetStat
 				return nil
 			}
 		case <-ctx.Done():
-			return fmt.Errorf("timeout occured waiting for storage action of volume: %q", volumeId)
+			return fmt.Errorf("timeout occured waiting for EBS %v volume: %q", action, volumeId)
 		}
 
 	}

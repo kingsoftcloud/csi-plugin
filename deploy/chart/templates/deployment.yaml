@@ -150,6 +150,7 @@ spec:
             - "--csi-address=$(ADDRESS)"
             - "--timeout=20s"
             - "--leader-election=true"
+            - "--handle-volume-inuse-error=false"
           env:
             - name: ADDRESS
               value: /var/lib/csi/sockets/com.ksc.csi.diskplugin/csi.sock
@@ -212,8 +213,9 @@ spec:
             name: nfs-socket-dir
           - mountPath: /var/lib/csi/sockets/com.ksc.csi.ks3plugin/
             name: ks3-socket-dir
-          - mountPath: /var/lib/aksk
-            name: aksk
+          - name: aksk
+            mountPath: {{ .Values.aksk.mountPath }}
+            readOnly: true
       volumes:
       - emptyDir: {}
         name: disk-socket-dir
@@ -225,6 +227,14 @@ spec:
           path: {{ .Values.kubeletDir }}/pods
           type: Directory
         name: pods-mount-dir
+    {{- if eq .Values.aksk.source "configMap" }}
       - name: aksk
         configMap:
-          name: user-temp-aksk
+          name: {{ .Values.aksk.name }}
+    {{- else if eq .Values.aksk.source "secret" }}
+      - name: aksk
+        secret:
+          secretName: {{ .Values.aksk.name }}
+    {{- else }}
+    {{ fail "auth.source must be either 'configMap' or 'secret'" }}
+    {{- end }}

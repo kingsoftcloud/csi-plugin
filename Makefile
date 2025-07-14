@@ -1,7 +1,7 @@
 #host
 #10.69.69.225 hub-t.kce.ksyun.com
 
-VERSION ?= 1.8.14
+VERSION ?= 1.8.15
 
 ARCH ?= amd64
 
@@ -47,9 +47,3 @@ test:
 	# go test --cover  ./driver/disk
 	go test --cover  ./driver/nfs
 
-build-mp-image:
-	manifest-tool --username admin --password UHdkLUZvci1TZWNyZXRhcnktTWlhbwo= \
-	push from-args --platforms linux/amd64,linux/arm64 \
-	--template hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-ARCH \
-	--target hub.kce.ksyun.com/ksyun/csi-diskplugin:$(VERSION)-mp \
-	

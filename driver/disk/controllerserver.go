@@ -498,6 +498,12 @@ func (cs *KscEBSControllerServer) ControllerUnpublishVolume(ctx context.Context,
 	if _, err := cs.ebsClient.Detach(detachVolumeReq); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
+	// waiting until volume is detached
+	if err := ebsClient.WaitVolumeStatus(cs.ebsClient, req.VolumeId, ebsClient.AVAILABLE_STATUS, req.NodeId, time.Second*10, "detach"); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
 	klog.V(2).Info("volume is detached")
 
 	return &csi.ControllerUnpublishVolumeResponse{}, nil
@@ -576,7 +582,7 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 
 	// waiting until volume is available
 	if vol.VolumeStatus != ebsClient.AVAILABLE_STATUS {
-		if err := ebsClient.WaitVolumeStatus(cs.ebsClient, vol.VolumeId, ebsClient.AVAILABLE_STATUS, req.NodeId); err != nil {
+		if err := ebsClient.WaitVolumeStatus(cs.ebsClient, vol.VolumeId, ebsClient.AVAILABLE_STATUS, req.NodeId, time.Minute, "attach"); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
@@ -592,7 +598,7 @@ func (cs *KscEBSControllerServer) ControllerPublishVolume(ctx context.Context, r
 	}
 
 	// waiting until volume is attached
-	if err := ebsClient.WaitVolumeStatus(cs.ebsClient, req.VolumeId, ebsClient.INUSE_STATUS, req.NodeId); err != nil {
+	if err := ebsClient.WaitVolumeStatus(cs.ebsClient, req.VolumeId, ebsClient.INUSE_STATUS, req.NodeId, time.Minute, "attach"); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	klog.V(5).Info("volume attached")
