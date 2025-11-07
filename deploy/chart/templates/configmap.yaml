@@ -9,8 +9,8 @@ metadata:
 data:
   aksk-conf: |
     {
-      "region": "",
+      "region": "{{ .Values.region }}",
       "aksk_type": "file",
-      "aksk_file_path": "",
+      "aksk_file_path": "{{ .Values.aksk.mountPath }}",
       "encrypt": false
     }
