@@ -110,38 +110,6 @@ spec:
           volumeMounts:
             - name: disk-socket-dir
               mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
-        - name: csi-snapshotter
-          image: {{ include "imageSpec" (list .Values.app.image "externalSnapshotter") }}
-          resources:
-            requests:
-              cpu: 10m
-              memory: 16Mi
-            limits:
-              cpu: 500m
-              memory: 1024Mi
-          args:
-            - "--v=2"
-            - "--csi-address=$(ADDRESS)"
-            - "--leader-election=true"
-            - "--extra-create-metadata=true"
-          env:
-            - name: ADDRESS
-              value: /var/lib/csi/sockets/com.ksc.csi.diskplugin/csi.sock
-          volumeMounts:
-            - name: disk-socket-dir
-              mountPath: /var/lib/csi/sockets/com.ksc.csi.diskplugin/
-        - name: csi-snapshot-controller
-          image: {{ include "imageSpec" (list .Values.app.image "externalSnapshotController") }}
-          resources:
-            requests:
-              cpu: 10m
-              memory: 16Mi
-            limits:
-              cpu: 500m
-              memory: 1024Mi
-          args:
-            - "--v=2"
-            - "--leader-election=true"
         - name: csi-disk-resizer
           imagePullPolicy: IfNotPresent
           image:  {{ include "imageSpec" (list .Values.app.image "externalResizer") }}

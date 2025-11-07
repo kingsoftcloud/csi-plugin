@@ -89,7 +89,41 @@ image: hub.kce.ksyun.com/ksyun/csi-diskplugin:1.9.1-open
 imagePullPolicy: Always
 name: csi-diskplugin
 ```
-3. 执行 `make deploy_all` 部署csi插件服务
+3. 修改[aksk-configmap.yaml](deploy/aksk-configmap.yaml)中字段为您的实际情况
+```yaml
+data:
+  aksk-conf: |
+    {
+      "region": "cn-beijing-6",
+      "aksk_type": "file",
+      "aksk_file_path": "",
+    }
+
+```
+4. 执行 `make deploy_all` 部署csi插件服务
+
+## 通过 helm chart 部署
+1. 修改 values.yaml 中镜像地址
+```
+image:
+   registry: hub.kce.ksyun.com
+   pullPolicy: IfNotPresent
+   namespace: kube-system
+   driver: com.ksc.csi.diskplugin,com.ksc.csi.nfsplugin,com.ksc.csi.ks3plugin
+   controller:
+   repo: ksyun/csi-diskplugin
+   tag: 1.8.15-mp
+```
+2. 修改 values.yaml kubeletDir、region 与 aksk 信息为您的实际情况
+```yaml
+kubeletDir: /data/kubelet
+region: cn-beijing-6
+
+aksk:
+  source: configMap  # 或 secret
+  name: user-temp-aksk
+  mountPath: /var/lib/aksk
+```
 
 ## 使用 csi plugin 存储卷
 

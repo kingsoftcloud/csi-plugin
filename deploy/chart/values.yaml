@@ -49,6 +49,7 @@ controller:
 
 
 kubeletDir: /data/kubelet
+region: cn-beijing-6
 
 aksk:
   source: configMap  # 或 secret
